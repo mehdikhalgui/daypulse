@@ -5,7 +5,7 @@ DayPulse : plugin météo, marchés et agenda pour TRMNL
 -->
 
 
-This project (DayPulse) generates data (Open-Meteo + yfinance + Google Calendar) and sends it to a TRMNL Private Plugin using the TRMNL webhook endpoint.
+This project (DayPulse) generates data (Nominatim + Open-Meteo + yfinance + Google Calendar) and sends it to a TRMNL Private Plugin using the TRMNL webhook endpoint.
 
 It also supports generating a local preview HTML so you can see what will render on the device.
 
@@ -34,10 +34,11 @@ Optional additions in the YAML config:
 
 - `general.network.request_timeout_seconds`, `max_retries`, `retry_delay_seconds`, `retry_backoff`, `retry_statuses`
 - `trmnl.payload_soft_limit_bytes` to tune the payload-size warning threshold
+- `weather.address` to geocode a postal address via Nominatim and automatically resolve the city name shown in the UI
 - `weather.unit_system` to switch between traditional unit sets: `metric` (`°C` + `km/h`) or `imperial` (`°F` + `mph`)
 - `finance.entries[]` to define each instrument with `symbol`, `label`, `currency`, and `show_currency`
 
-For weather, `metric` is the default and matches the usual European convention. `imperial` follows the common US convention. Legacy `weather.temperature_unit` and `weather.wind_speed_unit` overrides are still supported for advanced cases.
+For weather, `metric` is the default and matches the usual European convention. `imperial` follows the common US convention. The recommended setup is now `weather.address`; the script geocodes it with Nominatim, uses the resulting coordinates for Open-Meteo, and keeps showing a city label in the UI. Legacy `weather.city`, `weather.latitude`, `weather.longitude`, `weather.temperature_unit`, and `weather.wind_speed_unit` remain supported for advanced or fallback cases.
 
 The script now emits richer `INFO` logs by default: configuration summary, source start/end, source timings, fallback usage and human-readable TRMNL HTTP diagnostics.
 

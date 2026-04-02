@@ -3,7 +3,7 @@
 # Notes:
 # - The TRMNL webhook URL is the one shown in your plugin instance configuration.
 #   It contains your Plugin Settings UUID.
-# - Open-Meteo does not require an API key for typical personal usage.
+# - Nominatim and Open-Meteo do not require an API key for typical personal usage.
 # - For Google Calendar you can use either OAuth (interactive) or a Service Account.
 
 general:
@@ -25,10 +25,13 @@ trmnl:
   payload_soft_limit_bytes: 2048
 
 weather:
-  city: "Paris"
-  latitude: 48.8566
-  longitude: 2.3522
+  address: "Paris, France"
   unit_system: metric         # metric = celsius + km/h | imperial = fahrenheit + mph
+  # The UI still shows a city label resolved from Nominatim.
+  # Legacy fallback remains supported if needed:
+  # city: "Paris"
+  # latitude: 48.8566
+  # longitude: 2.3522
   # Legacy advanced overrides remain supported if needed:
   # temperature_unit: celsius   # celsius | fahrenheit
   # wind_speed_unit: kmh        # kmh | mph | ms | kn

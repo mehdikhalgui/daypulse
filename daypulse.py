@@ -13,6 +13,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, TypedDic
 import requests
 import yaml
 import yfinance as yf
+from geopy.geocoders import Nominatim
 
 
 try:
@@ -617,6 +618,110 @@ def _format_wind_summary(direction: str, wind_speed: int | str, wind_speed_label
     return " ".join(parts) if parts else "—"
 
 
+def _guess_city_from_address(address: str) -> str:
+    """Guess a city-like label from a free-form postal address when no provider city is available."""
+    parts = [part.strip() for part in str(address).split(",") if str(part).strip()]
+    if not parts:
+        return ""
+    if len(parts) == 1:
+        return parts[0]
+    candidate_parts = parts[:-1]
+    for candidate in reversed(candidate_parts):
+        has_digit = any(ch.isdigit() for ch in candidate)
+        if has_digit or len(candidate) <= 2:
+            continue
+        return candidate
+    return candidate_parts[-1] if candidate_parts else parts[0]
+
+
+def _extract_city_from_nominatim(raw: Dict[str, Any], address_query: str) -> str:
+    """Extract a compact city label from a Nominatim geocoding response."""
+    address = _as_dict(raw.get("address"))
+    for key in (
+        "city",
+        "town",
+        "village",
+        "municipality",
+        "hamlet",
+        "suburb",
+        "county",
+        "state_district",
+        "state",
+    ):
+        value = str(address.get(key, "")).strip()
+        if value:
+            return value
+    display_name = str(raw.get("display_name", "")).strip()
+    if display_name:
+        return _guess_city_from_address(display_name)
+    return _guess_city_from_address(address_query)
+
+
+def _resolve_weather_config_city(config: Dict[str, Any]) -> str:
+    """Return the best display label available from configured weather location values."""
+    weather_cfg = _as_dict(config.get("weather"))
+    city = str(weather_cfg.get("city", "")).strip()
+    if city:
+        return city
+    address = str(weather_cfg.get("address", "")).strip()
+    if address:
+        guessed_city = _guess_city_from_address(address)
+        if guessed_city:
+            return guessed_city
+    return ""
+
+
+def _resolve_weather_location(config: Dict[str, Any], lang: str) -> Tuple[float, float, str]:
+    """Resolve weather coordinates from an address via Nominatim or legacy latitude/longitude config."""
+    weather_cfg = _as_dict(config.get("weather"))
+    address_query = str(weather_cfg.get("address", "")).strip()
+    legacy_city = str(weather_cfg.get("city", "")).strip()
+    lat = weather_cfg.get("latitude")
+    lon = weather_cfg.get("longitude")
+
+    if address_query:
+        network_cfg = _get_network_config(config)
+        geolocator = Nominatim(user_agent="daypulse/1.0")
+
+        def _geocode(_: int) -> Any:
+            return geolocator.geocode(
+                address_query,
+                exactly_one=True,
+                addressdetails=True,
+                language=lang,
+                timeout=int(network_cfg["request_timeout_seconds"]),
+            )
+
+        location = _run_with_retries(
+            f"Weather geocoding for {address_query}",
+            max_retries=int(network_cfg["max_retries"]),
+            retry_delay_seconds=float(network_cfg["retry_delay_seconds"]),
+            retry_backoff=float(network_cfg["retry_backoff"]),
+            func=_geocode,
+        )
+        if location is None:
+            raise ValueError(f"Unable to geocode weather.address: {address_query}")
+
+        resolved_lat = float(location.latitude)
+        resolved_lon = float(location.longitude)
+        raw = getattr(location, "raw", None)
+        raw_dict = raw if isinstance(raw, dict) else {}
+        city = _extract_city_from_nominatim(raw_dict, address_query)
+        LOGGER.info(
+            "Weather address resolved via Nominatim: %s -> city=%s lat=%s lon=%s",
+            address_query,
+            city or "-",
+            resolved_lat,
+            resolved_lon,
+        )
+        return resolved_lat, resolved_lon, city or legacy_city or _guess_city_from_address(address_query)
+
+    if lat is None or lon is None:
+        raise ValueError("weather.address or weather.latitude/weather.longitude are required")
+
+    return float(lat), float(lon), legacy_city
+
+
 def _open_meteo_icon(weather_code: Optional[int]) -> str:
     """Map an Open-Meteo weather code to the TRMNL icon identifier."""
     # Map Open-Meteo weather codes to TRMNL Weather Icons (wi-*.svg).
@@ -644,14 +749,8 @@ def _open_meteo_icon(weather_code: Optional[int]) -> str:
 
 def fetch_weather(config: Dict[str, Any], lang: str) -> WeatherPayload:
     """Fetch current weather and a three-day forecast from Open-Meteo."""
-    weather_cfg = config.get("weather", {})
-    lat = weather_cfg.get("latitude")
-    lon = weather_cfg.get("longitude")
-    city = weather_cfg.get("city", "")
+    lat, lon, city = _resolve_weather_location(config, lang)
     units = _resolve_weather_units(config)
-
-    if lat is None or lon is None:
-        raise ValueError("weather.latitude and weather.longitude are required")
 
     url = "https://api.open-meteo.com/v1/forecast"
     params = {
@@ -998,8 +1097,7 @@ def fetch_calendar(config: Dict[str, Any], lang: str, *, all_day_label: str) -> 
 
 def _default_weather(config: Dict[str, Any]) -> WeatherPayload:
     """Return a safe fallback weather payload that preserves the widget layout."""
-    weather_cfg = config.get("weather", {})
-    city = weather_cfg.get("city", "")
+    city = _resolve_weather_config_city(config)
     units = _resolve_weather_units(config)
     return {
         "ok": False,
@@ -1094,9 +1192,8 @@ def build_merge_variables_random(
         errors.append("weather")
         LOGGER.warning("[weather] Random mode forced fallback data")
     else:
-        weather_cfg = config.get("weather", {})
         units = _resolve_weather_units(config)
-        city = str(weather_cfg.get("city", ""))
+        city = _resolve_weather_config_city(config)
         temp = rng.randint(-5, 35)
         humidity = rng.randint(25, 95)
         wind_speed = rng.randint(5, 45)
@@ -1551,9 +1648,17 @@ def main(argv: Optional[List[str]] = None) -> int:
         raise ValueError("trmnl.webhook_url is required")
 
     finance_entries = _get_finance_entries(config)
+    weather_cfg = _as_dict(config.get("weather"))
+    weather_location_summary = str(weather_cfg.get("address", "")).strip()
+    if not weather_location_summary:
+        legacy_city = str(weather_cfg.get("city", "")).strip()
+        if legacy_city:
+            weather_location_summary = legacy_city
+        elif weather_cfg.get("latitude") is not None and weather_cfg.get("longitude") is not None:
+            weather_location_summary = f"{weather_cfg.get('latitude')},{weather_cfg.get('longitude')}"
     LOGGER.info(
-        "Config summary: city=%s tickers=%s label_overrides=%s calendar_mode=%s timeout=%ss payload_soft_limit=%s",
-        str(_as_dict(config.get("weather")).get("city", "")).strip() or "-",
+        "Config summary: weather_location=%s tickers=%s label_overrides=%s calendar_mode=%s timeout=%ss payload_soft_limit=%s",
+        weather_location_summary or "-",
         len(finance_entries),
         len([entry for entry in finance_entries if entry.get("label")]),
         str(_as_dict(config.get("google_calendar")).get("mode", "oauth")).strip().lower(),
