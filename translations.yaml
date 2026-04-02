@@ -1,0 +1,29 @@
+en:
+  weather: Weather
+  humidity: Humidity
+  wind: Wind
+  forecast: Next 3 days
+  markets: Markets
+  calendar: Calendar
+  all_day: All day
+  no_events: No events
+  updated: Updated
+  unavailable: Unavailable
+  data_unavailable: Data unavailable
+  dashboard: Dashboard
+  preview: Preview
+
+fr:
+  weather: Météo
+  humidity: Humidité
+  wind: Vent
+  forecast: Prochains 3 jours
+  markets: Marchés
+  calendar: Agenda
+  all_day: Toute la journée
+  no_events: Aucun évènement
+  updated: Mis à jour
+  unavailable: Indisponible
+  data_unavailable: Données indisponibles
+  dashboard: Tableau de bord
+  preview: Aperçu

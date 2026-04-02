@@ -1,0 +1,64 @@
+# Example configuration for the TRMNL webhook dashboard.
+#
+# Notes:
+# - The TRMNL webhook URL is the one shown in your plugin instance configuration.
+#   It contains your Plugin Settings UUID.
+# - Open-Meteo does not require an API key for typical personal usage.
+# - For Google Calendar you can use either OAuth (interactive) or a Service Account.
+
+general:
+  language: fr   # fr | en
+  log:
+    mode: console  # console | file | both | none
+    level: INFO
+    file: trmnl_dashboard.log
+  network:
+    request_timeout_seconds: 20
+    max_retries: 3
+    retry_delay_seconds: 2.0
+    retry_backoff: 2.0
+    retry_statuses: [429, 500, 502, 503, 504]
+
+trmnl:
+  webhook_url: "https://trmnl.com/api/custom_plugins/PUT-YOUR-PLUGIN-SETTINGS-UUID-HERE"
+  timeout_seconds: 15
+  payload_soft_limit_bytes: 2048
+
+weather:
+  city: "Paris"
+  latitude: 48.8566
+  longitude: 2.3522
+  temperature_unit: celsius   # celsius | fahrenheit
+  wind_speed_unit: kmh        # kmh | ms | mph | kn
+
+finance:
+  entries:
+    - symbol: "^FCHI"
+      label: "CAC 40"
+      show_currency: false
+    - symbol: "XAUEUR=X"
+      label: "Gold"
+      currency: "EUR"
+      show_currency: true
+    - symbol: "AI.PA"
+      label: "Air Liquide"
+      currency: "EUR"
+      show_currency: true
+    - symbol: "NVDA"
+      label: "Nvidia"
+      currency: "USD"
+      show_currency: true
+
+google_calendar:
+  mode: oauth  # oauth | service_account
+  timezone: "Europe/Paris"
+  calendar_id: primary
+  oauth:
+    credentials_json: "credentials.json"
+    token_json: "token.json"
+  service_account:
+    json: "service_account.json"
+
+calendar:
+  max_events_per_day: 3
+  max_title_length: 32
