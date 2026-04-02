@@ -16,22 +16,24 @@ Ce markup attend merge_variables avec la structure produite par le script Python
         <!-- Weather -->
         <div class="flex flex--col gap--small outline p--4 h--full" style="width:100%; min-width:0; box-sizing:border-box;">
           <div class="flex flex--row flex--center-x flex--center-y" style="margin-top:-0.2rem;">
-            <span class="title label--gray" style="font-size: 1.5rem; line-height:1;">{{ weather.city }}</span>
+            <span class="title">{{ weather.city }}</span>
           </div>
 
           {% unless weather.ok %}
             <span class="label label--small label--gray">{{ t.data_unavailable }}</span>
           {% endunless %}
 
-          <div class="flex flex--row flex--between flex--center-y" style="width:100%; justify-content:space-between; align-items:center;">
-            <div class="flex flex--row flex--center-y" style="justify-content:flex-start; align-items:center; gap:0.35rem;">
+          <div class="grid gap--small" style="width:100%; grid-template-columns:4.6rem minmax(0, 1fr) auto; align-items:center; column-gap:0.5rem;">
+            <div class="flex flex--center-x flex--center-y" style="justify-content:flex-start; align-items:center; width:4.6rem;">
               {% assign icon_url = "https://trmnl.com/images/plugins/weather/" | append: weather.current.icon | append: ".svg" %}
-              <img class="image image-dither w--20 h--20" src="{{ icon_url }}" alt="" />
-              <span class="value value--xlarge value--tnums" style="font-size: 3rem; line-height: 1;">{{ weather.current.temperature_display }}</span>
+              <img class="image image-dither w--20 h--20" src="{{ icon_url }}" alt="" style="width:4.4rem; height:4.4rem;" />
             </div>
-            <div class="flex flex--col gap--xsmall" style="margin-left:auto; text-align:right; align-items:flex-end; justify-content:flex-end; min-width:8rem;">
-              <span class="label label--xsmall label--underline" style="white-space: nowrap;">{{ t.humidity }} {{ weather.current.humidity }}%</span>
-              <span class="label label--xsmall label--underline flex flex--row" style="white-space: nowrap; width:100%; justify-content:flex-end; gap:0.35rem;">
+            <div class="flex flex--center-x flex--center-y" style="justify-content:center; align-items:center; text-align:center; min-width:0;">
+              <span class="value value--large value--tnums" style="font-size:3rem; line-height:1;">{{ weather.current.temperature_display }}</span>
+            </div>
+            <div class="flex flex--col gap--xsmall" style="text-align:right; align-items:flex-end; justify-content:flex-end; min-width:8rem;">
+              <span class="label label--underline" style="white-space: nowrap;">{{ t.humidity }} {{ weather.current.humidity }}%</span>
+              <span class="label label--underline flex flex--row" style="white-space: nowrap; width:100%; justify-content:flex-end; gap:0.35rem;">
                 <span>{{ t.wind }} {{ weather.current.wind_speed }} {{ weather.current.wind_speed_unit }}</span>
                 <span>{{ weather.current.wind_direction }}</span>
               </span>
@@ -39,14 +41,14 @@ Ce markup attend merge_variables avec la structure produite par le script Python
           </div>
 
           <div class="flex flex--col gap--xsmall" style="width:100%; margin-top:0.3rem;">
-            <span class="label label--xsmall label--gray" style="display:block; margin-top:0.15rem;">{{ t.forecast }}</span>
+            <span class="label label--gray" style="display:block; margin-top:0.15rem;">{{ t.forecast }}</span>
             <div class="grid grid--cols-3 gap--xsmall">
               {% for day in weather.forecast %}
                 {% assign day_icon_url = "https://trmnl.com/images/plugins/weather/" | append: day.icon | append: ".svg" %}
                 <div class="flex flex--col flex--center-x gap--xsmall">
                   <img class="image image-dither w--8 h--8" src="{{ day_icon_url }}" alt="" />
-                  <span class="label label--xsmall">{{ day.day_label }}</span>
-                  <span class="label label--xsmall">{{ day.temp_max }}°/{{ day.temp_min }}°</span>
+                  <span class="label">{{ day.day_label }}</span>
+                  <span class="label">{{ day.temp_max }}°/{{ day.temp_min }}°</span>
                 </div>
               {% endfor %}
             </div>
@@ -64,9 +66,9 @@ Ce markup attend merge_variables avec la structure produite par le script Python
               <tbody>
                 {% for idx in finance.indices %}
                   <tr>
-                    <td><span class="label label--xsmall" data-clamp="1">{{ idx.label }}</span></td>
-                    <td><span class="label label--xsmall label--gray">{{ idx.price }}</span></td>
-                    <td><span class="label label--xsmall">{{ idx.arrow }} {{ idx.change_percent }}%</span></td>
+                    <td><span class="label" data-clamp="1">{{ idx.label }}</span></td>
+                    <td><span class="label label--gray">{{ idx.price }}</span></td>
+                    <td><span class="label">{{ idx.arrow }} {{ idx.change_percent }}%</span></td>
                   </tr>
                 {% endfor %}
               </tbody>
@@ -85,17 +87,17 @@ Ce markup attend merge_variables avec la structure produite par le script Python
           {% for day in calendar.days %}
             <div class="flex flex--col gap--xsmall" style="min-width:0;">
               {% if day.is_weekend %}
-                <span class="label label--xsmall label--inverted rounded--xsmall" style="display:flex; align-items:center; justify-content:center; height:1.15rem; line-height:1; padding:0 0.25rem;"><span style="position:relative; top:1.75px; line-height:1;">{{ day.day_label }}</span></span>
+                <span class="label label--filled rounded--xsmall" style="display:flex; align-items:center; justify-content:center; height:1.3rem; line-height:1; padding:0 0.35rem;"><span style="position:relative; top:1.75px; line-height:1;">{{ day.day_label }}</span></span>
               {% else %}
-                <span class="label label--xsmall label--underline" style="line-height:1.15rem;">{{ day.day_label }}</span>
+                <span class="label label--underline" style="line-height:1.3rem;">{{ day.day_label }}</span>
               {% endif %}
               {% if calendar.ok %}
                 {% if day.events.size > 0 %}
                   {% for ev in day.events %}
-                    <span class="label label--xsmall" data-clamp="1">{{ ev.time_label }} {{ ev.summary }}</span>
+                    <span class="label" data-clamp="1">{{ ev.time_label }} {{ ev.summary }}</span>
                   {% endfor %}
                 {% else %}
-                  <span class="label label--xsmall label--gray">{{ t.no_events }}</span>
+                  <span class="label label--gray">{{ t.no_events }}</span>
                 {% endif %}
               {% endif %}
             </div>
@@ -103,7 +105,7 @@ Ce markup attend merge_variables avec la structure produite par le script Python
         </div>
         {% unless calendar.ok %}
           <div class="flex flex--center-x flex--center-y h--full" style="width:100%; flex:1;">
-            <span class="label label--gray" style="font-size:1.05rem; line-height:1.2;">{{ t.data_unavailable }}</span>
+            <span class="label label--large label--gray">{{ t.data_unavailable }}</span>
           </div>
         {% endunless %}
       </div>

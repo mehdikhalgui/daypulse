@@ -94,6 +94,7 @@ The preview renderer uses [preview_template.html](preview_template.html).
 ## Notes
 
 - TRMNL webhook rate limits apply (see TRMNL docs). Keep payload small by limiting calendar events.
+- For UI changes, prefer TRMNL framework primitives and utilities first (`title`, `value`, `label`, spacing/layout classes). Use inline size overrides only as a final small adjustment when the framework scale is close but not quite right.
 - Network calls now use configurable retries and backoff.
 - `finance.entries` keeps ticker symbol, label and currency behavior together in one place.
 - Set `show_currency: false` for instruments like the CAC 40 when you do not want a unit displayed.
