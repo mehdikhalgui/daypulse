@@ -2,6 +2,8 @@ en:
   weather: Weather
   humidity: Humidity
   wind: Wind
+  sunrise: Sunrise
+  sunset: Sunset
   forecast: Next 3 days
   markets: Markets
   calendar: Calendar
@@ -17,6 +19,8 @@ fr:
   weather: Météo
   humidity: Humidité
   wind: Vent
+  sunrise: Lever
+  sunset: Coucher
   forecast: Prochains 3 jours
   markets: Marchés
   calendar: Agenda

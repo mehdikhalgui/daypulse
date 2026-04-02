@@ -40,13 +40,25 @@ Ce markup attend merge_variables avec la structure produite par le script Python
             </div>
           </div>
 
+          <div class="flex flex--row flex--center-x" style="width:100%; margin-top:0.15rem; align-items:center; justify-content:center; gap:3rem;">
+            <div class="flex flex--row flex--center-y" style="align-items:center; gap:0.35rem;">
+              <img class="image image-dither" src="https://trmnl.com/images/plugins/weather/wi-sunrise.svg" alt="" style="width:1.35rem; height:1.35rem;" />
+              <span class="label label--gray">{{ t.sunrise }} {{ weather.current.sunrise_time }}</span>
+            </div>
+            <div class="flex flex--row flex--center-y" style="align-items:center; gap:0.35rem;">
+              {% assign moon_icon_url = "https://trmnl.com/images/plugins/weather/" | append: weather.current.moon_phase_icon | append: ".svg" %}
+              <img class="image image-dither" src="{{ moon_icon_url }}" alt="" style="width:1.35rem; height:1.35rem;" />
+              <span class="label label--gray">{{ t.sunset }} {{ weather.current.sunset_time }}</span>
+            </div>
+          </div>
+
           <div class="flex flex--col gap--xsmall" style="width:100%; margin-top:0.3rem;">
             <span class="label label--gray" style="display:block; margin-top:0.15rem;">{{ t.forecast }}</span>
-            <div class="grid grid--cols-3 gap--xsmall">
+            <div class="grid grid--cols-5 gap--xsmall" style="grid-template-columns:repeat(5, minmax(0, 1fr));">
               {% for day in weather.forecast %}
                 {% assign day_icon_url = "https://trmnl.com/images/plugins/weather/" | append: day.icon | append: ".svg" %}
                 <div class="flex flex--col flex--center-x gap--xsmall">
-                  <img class="image image-dither w--8 h--8" src="{{ day_icon_url }}" alt="" />
+                  <img class="image image-dither w--8 h--8" src="{{ day_icon_url }}" alt="" style="width:2.65rem; height:2.65rem;" />
                   <span class="label">{{ day.day_label }}</span>
                   <span class="label">{{ day.temp_max }}°/{{ day.temp_min }}°</span>
                 </div>

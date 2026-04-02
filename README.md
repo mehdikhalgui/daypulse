@@ -8,6 +8,7 @@ DayPulse : plugin météo, marchés et agenda pour TRMNL
 This project (DayPulse) generates data (Nominatim + Open-Meteo + yfinance + Google Calendar) and sends it to a TRMNL Private Plugin using the TRMNL webhook endpoint.
 
 It also supports generating a local preview HTML so you can see what will render on the device.
+The weather block uses TRMNL hosted weather icons, including night variants when Open-Meteo reports that the current timestep is after dark, and displays local sunrise/sunset times from Open-Meteo.
 
 ## 1) TRMNL setup
 

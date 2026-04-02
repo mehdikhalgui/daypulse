@@ -48,6 +48,9 @@ class WeatherCurrent(TypedDict):
     wind_speed: int | str
     wind_speed_unit: str
     wind_summary: str
+    sunrise_time: str
+    sunset_time: str
+    moon_phase_icon: str
     icon: str
 
 
@@ -618,6 +621,44 @@ def _format_wind_summary(direction: str, wind_speed: int | str, wind_speed_label
     return " ".join(parts) if parts else "—"
 
 
+def _format_iso_time_label(value: Any) -> str:
+    """Format an ISO datetime string as a compact HH:MM label."""
+    text = str(value or "").strip()
+    if not text:
+        return "—"
+    if "T" in text:
+        text = text.split("T", 1)[1]
+    if len(text) >= 5:
+        return text[:5]
+    return text
+
+
+def _moon_phase_icon_for_time(current_time: str) -> str:
+    """Return a TRMNL moon-phase icon name for the provided local current-weather timestamp."""
+    reference_new_moon = dt.datetime(2000, 1, 6, 18, 14)
+    synodic_month_days = 29.53058867
+    try:
+        moment = dt.datetime.fromisoformat(current_time)
+    except Exception:
+        moment = dt.datetime.now()
+
+    days_since_new_moon = (moment - reference_new_moon).total_seconds() / 86400.0
+    lunar_age = days_since_new_moon % synodic_month_days
+    phase_index = int(((lunar_age / synodic_month_days) * 8) + 0.5) % 8
+
+    phase_icons = [
+        "wi-moon-alt-new",
+        "wi-moon-alt-waxing-crescent-3",
+        "wi-moon-alt-first-quarter",
+        "wi-moon-alt-waxing-gibbous-3",
+        "wi-moon-alt-full",
+        "wi-moon-alt-waning-gibbous-3",
+        "wi-moon-alt-third-quarter",
+        "wi-moon-alt-waning-crescent-3",
+    ]
+    return phase_icons[phase_index]
+
+
 def _guess_city_from_address(address: str) -> str:
     """Guess a city-like label from a free-form postal address when no provider city is available."""
     parts = [part.strip() for part in str(address).split(",") if str(part).strip()]
@@ -722,27 +763,42 @@ def _resolve_weather_location(config: Dict[str, Any], lang: str) -> Tuple[float,
     return float(lat), float(lon), legacy_city
 
 
-def _open_meteo_icon(weather_code: Optional[int]) -> str:
+def _open_meteo_icon(weather_code: Optional[int], *, is_day: Optional[bool] = True) -> str:
     """Map an Open-Meteo weather code to the TRMNL icon identifier."""
     # Map Open-Meteo weather codes to TRMNL Weather Icons (wi-*.svg).
     # Icons used here are those hosted by TRMNL.
+    is_night = is_day is False
     if weather_code is None:
         return "wi-cloudy"
     if weather_code == 0:
+        if is_night:
+            return "wi-night-clear"
         return "wi-day-sunny"
     if weather_code in {1, 2}:
+        if is_night:
+            return "wi-night-alt-cloudy"
         return "wi-day-cloudy"
     if weather_code == 3:
         return "wi-cloudy"
     if weather_code in {45, 48}:
+        if is_night:
+            return "wi-night-fog"
         return "wi-fog"
     if weather_code in {51, 53, 55, 56, 57}:
+        if is_night:
+            return "wi-night-alt-sprinkle"
         return "wi-sprinkle"
     if weather_code in {61, 63, 65, 66, 67, 80, 81, 82}:
+        if is_night:
+            return "wi-night-alt-rain"
         return "wi-rain"
     if weather_code in {71, 73, 75, 77, 85, 86}:
+        if is_night:
+            return "wi-night-alt-snow"
         return "wi-snow"
     if weather_code in {95, 96, 99}:
+        if is_night:
+            return "wi-night-alt-thunderstorm"
         return "wi-thunderstorm"
     return "wi-cloudy"
 
@@ -759,9 +815,9 @@ def fetch_weather(config: Dict[str, Any], lang: str) -> WeatherPayload:
         "timezone": "auto",
         "temperature_unit": units["temperature_unit"],
         "wind_speed_unit": units["wind_speed_unit"],
-        "current": "temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,weather_code",
-        "daily": "weather_code,temperature_2m_max,temperature_2m_min",
-        "forecast_days": 4,
+        "current": "temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,weather_code,is_day",
+        "daily": "weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset",
+        "forecast_days": 6,
     }
 
     LOGGER.info("Weather request prepared for %s (lat=%s, lon=%s)", city or "unknown city", lat, lon)
@@ -790,6 +846,8 @@ def fetch_weather(config: Dict[str, Any], lang: str) -> WeatherPayload:
     wind_speed = current.get("wind_speed_10m")
     wind_dir = current.get("wind_direction_10m")
     weather_code = current.get("weather_code")
+    is_day_value = current.get("is_day")
+    is_day = bool(int(is_day_value)) if is_day_value is not None else None
     temperature_value = int(round(float(temperature))) if temperature is not None else "—"
     humidity_value = int(round(float(humidity))) if humidity is not None else "—"
     wind_speed_value = int(round(float(wind_speed))) if wind_speed is not None else "—"
@@ -799,10 +857,15 @@ def fetch_weather(config: Dict[str, Any], lang: str) -> WeatherPayload:
     wcodes: List[Any] = list(daily.get("weather_code") or [])
     tmax: List[Any] = list(daily.get("temperature_2m_max") or [])
     tmin: List[Any] = list(daily.get("temperature_2m_min") or [])
+    sunrises: List[Any] = list(daily.get("sunrise") or [])
+    sunsets: List[Any] = list(daily.get("sunset") or [])
+    sunrise_time = _format_iso_time_label(sunrises[0]) if sunrises else "—"
+    sunset_time = _format_iso_time_label(sunsets[0]) if sunsets else "—"
+    moon_phase_icon = _moon_phase_icon_for_time(current_time)
 
     forecast: List[WeatherForecastDay] = []
-    # Next 3 days (excluding today) if available.
-    for i in range(1, min(4, len(times))):
+    # Next 5 days (excluding today) if available.
+    for i in range(1, min(6, len(times))):
         day_iso = times[i]
         try:
             day_date = dt.date.fromisoformat(day_iso)
@@ -842,7 +905,10 @@ def fetch_weather(config: Dict[str, Any], lang: str) -> WeatherPayload:
             "wind_speed": wind_speed_value,
             "wind_speed_unit": units["wind_speed_label"],
             "wind_summary": _format_wind_summary(wind_direction, wind_speed_value, units["wind_speed_label"]),
-            "icon": _open_meteo_icon(int(weather_code) if weather_code is not None else None),
+            "sunrise_time": sunrise_time,
+            "sunset_time": sunset_time,
+            "moon_phase_icon": moon_phase_icon,
+            "icon": _open_meteo_icon(int(weather_code) if weather_code is not None else None, is_day=is_day),
         },
         "forecast": forecast,
     }
@@ -1111,9 +1177,14 @@ def _default_weather(config: Dict[str, Any]) -> WeatherPayload:
             "wind_speed": "—",
             "wind_speed_unit": units["wind_speed_label"],
             "wind_summary": "—",
+            "sunrise_time": "—",
+            "sunset_time": "—",
+            "moon_phase_icon": "wi-moon-alt-new",
             "icon": "wi-cloudy",
         },
         "forecast": [
+            {"day_label": "—", "icon": "wi-cloudy", "temp_max": "—", "temp_min": "—"},
+            {"day_label": "—", "icon": "wi-cloudy", "temp_max": "—", "temp_min": "—"},
             {"day_label": "—", "icon": "wi-cloudy", "temp_max": "—", "temp_min": "—"},
             {"day_label": "—", "icon": "wi-cloudy", "temp_max": "—", "temp_min": "—"},
             {"day_label": "—", "icon": "wi-cloudy", "temp_max": "—", "temp_min": "—"},
@@ -1198,6 +1269,9 @@ def build_merge_variables_random(
         humidity = rng.randint(25, 95)
         wind_speed = rng.randint(5, 45)
         wind_deg = rng.uniform(0, 359.9)
+        is_day = bool(rng.randint(0, 1))
+        sunrise_time = f"{rng.randint(5, 7):02d}:{rng.choice([0, 10, 20, 30, 40, 50]):02d}"
+        sunset_time = f"{rng.randint(18, 21):02d}:{rng.choice([0, 10, 20, 30, 40, 50]):02d}"
         icon_choices = [
             "wi-day-sunny",
             "wi-day-cloudy",
@@ -1207,15 +1281,22 @@ def build_merge_variables_random(
             "wi-rain",
             "wi-snow",
             "wi-thunderstorm",
+            "wi-night-clear",
+            "wi-night-alt-cloudy",
+            "wi-night-fog",
+            "wi-night-alt-sprinkle",
+            "wi-night-alt-rain",
+            "wi-night-alt-snow",
+            "wi-night-alt-thunderstorm",
         ]
-        icon = rng.choice(icon_choices)
+        icon = _open_meteo_icon(rng.choice([0, 1, 2, 3, 45, 61, 71, 95]), is_day=is_day)
 
         # Local-ish timestamp
         time_label = dt.datetime.now().strftime("%Y-%m-%d %H:%M")
 
         today = dt.date.today()
         forecast: List[WeatherForecastDay] = []
-        for i in range(1, 4):
+        for i in range(1, 6):
             d = today + dt.timedelta(days=i)
             tmax = rng.randint(temp, temp + 8)
             tmin = rng.randint(temp - 8, temp)
@@ -1244,6 +1325,9 @@ def build_merge_variables_random(
                     wind_speed,
                     units["wind_speed_label"],
                 ),
+                "sunrise_time": sunrise_time,
+                "sunset_time": sunset_time,
+                "moon_phase_icon": _moon_phase_icon_for_time(time_label.replace(" ", "T")),
                 "icon": icon,
             },
             "forecast": forecast,
