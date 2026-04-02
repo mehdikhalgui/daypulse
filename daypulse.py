@@ -41,8 +41,12 @@ class WeatherCurrent(TypedDict):
 
     time_label: str
     temperature: int | str
+    temperature_display: str
     humidity: int | str
     wind_direction: str
+    wind_speed: int | str
+    wind_speed_unit: str
+    wind_summary: str
     icon: str
 
 
@@ -551,6 +555,68 @@ def _wind_direction_cardinal(degrees: Optional[float]) -> str:
     return dirs[idx]
 
 
+def _resolve_weather_units(config: Dict[str, Any]) -> Dict[str, str]:
+    """Resolve weather units from a simple unit system or legacy explicit values."""
+    weather_cfg = _as_dict(config.get("weather"))
+    unit_system = str(weather_cfg.get("unit_system", "")).strip().lower()
+
+    if unit_system == "imperial":
+        return {
+            "unit_system": "imperial",
+            "temperature_unit": "fahrenheit",
+            "temperature_symbol": "F",
+            "wind_speed_unit": "mph",
+            "wind_speed_label": "mph",
+        }
+    if unit_system == "metric":
+        return {
+            "unit_system": "metric",
+            "temperature_unit": "celsius",
+            "temperature_symbol": "C",
+            "wind_speed_unit": "kmh",
+            "wind_speed_label": "km/h",
+        }
+
+    temperature_unit = str(weather_cfg.get("temperature_unit", "celsius")).strip().lower() or "celsius"
+    wind_speed_unit = str(weather_cfg.get("wind_speed_unit", "kmh")).strip().lower() or "kmh"
+
+    wind_speed_labels = {
+        "kmh": "km/h",
+        "mph": "mph",
+        "ms": "m/s",
+        "kn": "kn",
+    }
+    temperature_symbols = {
+        "celsius": "C",
+        "fahrenheit": "F",
+    }
+
+    return {
+        "unit_system": "legacy",
+        "temperature_unit": temperature_unit,
+        "temperature_symbol": temperature_symbols.get(temperature_unit, "C"),
+        "wind_speed_unit": wind_speed_unit,
+        "wind_speed_label": wind_speed_labels.get(wind_speed_unit, wind_speed_unit),
+    }
+
+
+def _format_temperature_display(temperature: int | str, temperature_symbol: str) -> str:
+    """Return a compact temperature string with its unit when available."""
+    if temperature == "—":
+        return "—"
+    return f"{temperature}°{temperature_symbol}"
+
+
+def _format_wind_summary(direction: str, wind_speed: int | str, wind_speed_label: str) -> str:
+    """Return a compact wind label including direction and speed when available."""
+    parts: List[str] = []
+    if direction and direction != "—":
+        parts.append(direction)
+    if wind_speed != "—":
+        parts.append(f"{wind_speed} {wind_speed_label}".strip())
+    return " ".join(parts) if parts else "—"
+
+
 def _open_meteo_icon(weather_code: Optional[int]) -> str:
     """Map an Open-Meteo weather code to the TRMNL icon identifier."""
     # Map Open-Meteo weather codes to TRMNL Weather Icons (wi-*.svg).
@@ -582,8 +648,7 @@ def fetch_weather(config: Dict[str, Any], lang: str) -> WeatherPayload:
     lat = weather_cfg.get("latitude")
     lon = weather_cfg.get("longitude")
     city = weather_cfg.get("city", "")
-    temperature_unit = weather_cfg.get("temperature_unit", "celsius")
-    wind_speed_unit = weather_cfg.get("wind_speed_unit", "kmh")
+    units = _resolve_weather_units(config)
 
     if lat is None or lon is None:
         raise ValueError("weather.latitude and weather.longitude are required")
@@ -593,9 +658,9 @@ def fetch_weather(config: Dict[str, Any], lang: str) -> WeatherPayload:
         "latitude": lat,
         "longitude": lon,
         "timezone": "auto",
-        "temperature_unit": temperature_unit,
-        "wind_speed_unit": wind_speed_unit,
-        "current": "temperature_2m,relative_humidity_2m,wind_direction_10m,weather_code",
+        "temperature_unit": units["temperature_unit"],
+        "wind_speed_unit": units["wind_speed_unit"],
+        "current": "temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,weather_code",
         "daily": "weather_code,temperature_2m_max,temperature_2m_min",
         "forecast_days": 4,
     }
@@ -623,8 +688,13 @@ def fetch_weather(config: Dict[str, Any], lang: str) -> WeatherPayload:
 
     temperature = current.get("temperature_2m")
     humidity = current.get("relative_humidity_2m")
+    wind_speed = current.get("wind_speed_10m")
     wind_dir = current.get("wind_direction_10m")
     weather_code = current.get("weather_code")
+    temperature_value = int(round(float(temperature))) if temperature is not None else "—"
+    humidity_value = int(round(float(humidity))) if humidity is not None else "—"
+    wind_speed_value = int(round(float(wind_speed))) if wind_speed is not None else "—"
+    wind_direction = _wind_direction_cardinal(float(wind_dir)) if wind_dir is not None else "—"
 
     times: List[str] = list(daily.get("time") or [])
     wcodes: List[Any] = list(daily.get("weather_code") or [])
@@ -652,10 +722,12 @@ def fetch_weather(config: Dict[str, Any], lang: str) -> WeatherPayload:
         )
 
     LOGGER.info(
-        "Weather OK - %s, temp=%s, humidity=%s, forecast_days=%s",
+        "Weather OK - %s, temp=%s%s, humidity=%s, wind=%s, forecast_days=%s",
         city or "unknown city",
-        int(round(float(temperature))) if temperature is not None else "—",
-        int(round(float(humidity))) if humidity is not None else "—",
+        temperature_value,
+        f"°{units['temperature_symbol']}" if temperature_value != "—" else "",
+        humidity_value,
+        _format_wind_summary(wind_direction, wind_speed_value, units["wind_speed_label"]),
         len(forecast),
     )
 
@@ -664,9 +736,13 @@ def fetch_weather(config: Dict[str, Any], lang: str) -> WeatherPayload:
         "city": city,
         "current": {
             "time_label": time_label,
-            "temperature": int(round(float(temperature))) if temperature is not None else "—",
-            "humidity": int(round(float(humidity))) if humidity is not None else "—",
-            "wind_direction": _wind_direction_cardinal(float(wind_dir)) if wind_dir is not None else "—",
+            "temperature": temperature_value,
+            "temperature_display": _format_temperature_display(temperature_value, units["temperature_symbol"]),
+            "humidity": humidity_value,
+            "wind_direction": wind_direction,
+            "wind_speed": wind_speed_value,
+            "wind_speed_unit": units["wind_speed_label"],
+            "wind_summary": _format_wind_summary(wind_direction, wind_speed_value, units["wind_speed_label"]),
             "icon": _open_meteo_icon(int(weather_code) if weather_code is not None else None),
         },
         "forecast": forecast,
@@ -924,14 +1000,19 @@ def _default_weather(config: Dict[str, Any]) -> WeatherPayload:
     """Return a safe fallback weather payload that preserves the widget layout."""
     weather_cfg = config.get("weather", {})
     city = weather_cfg.get("city", "")
+    units = _resolve_weather_units(config)
     return {
         "ok": False,
         "city": city,
         "current": {
             "time_label": "—",
             "temperature": "—",
+            "temperature_display": "—",
             "humidity": "—",
             "wind_direction": "—",
+            "wind_speed": "—",
+            "wind_speed_unit": units["wind_speed_label"],
+            "wind_summary": "—",
             "icon": "wi-cloudy",
         },
         "forecast": [
@@ -1014,9 +1095,11 @@ def build_merge_variables_random(
         LOGGER.warning("[weather] Random mode forced fallback data")
     else:
         weather_cfg = config.get("weather", {})
+        units = _resolve_weather_units(config)
         city = str(weather_cfg.get("city", ""))
         temp = rng.randint(-5, 35)
         humidity = rng.randint(25, 95)
+        wind_speed = rng.randint(5, 45)
         wind_deg = rng.uniform(0, 359.9)
         icon_choices = [
             "wi-day-sunny",
@@ -1054,8 +1137,16 @@ def build_merge_variables_random(
             "current": {
                 "time_label": time_label,
                 "temperature": temp,
+                "temperature_display": _format_temperature_display(temp, units["temperature_symbol"]),
                 "humidity": humidity,
                 "wind_direction": _wind_direction_cardinal(wind_deg),
+                "wind_speed": wind_speed,
+                "wind_speed_unit": units["wind_speed_label"],
+                "wind_summary": _format_wind_summary(
+                    _wind_direction_cardinal(wind_deg),
+                    wind_speed,
+                    units["wind_speed_label"],
+                ),
                 "icon": icon,
             },
             "forecast": forecast,

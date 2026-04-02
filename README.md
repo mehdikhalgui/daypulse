@@ -34,7 +34,10 @@ Optional additions in the YAML config:
 
 - `general.network.request_timeout_seconds`, `max_retries`, `retry_delay_seconds`, `retry_backoff`, `retry_statuses`
 - `trmnl.payload_soft_limit_bytes` to tune the payload-size warning threshold
+- `weather.unit_system` to switch between traditional unit sets: `metric` (`°C` + `km/h`) or `imperial` (`°F` + `mph`)
 - `finance.entries[]` to define each instrument with `symbol`, `label`, `currency`, and `show_currency`
+
+For weather, `metric` is the default and matches the usual European convention. `imperial` follows the common US convention. Legacy `weather.temperature_unit` and `weather.wind_speed_unit` overrides are still supported for advanced cases.
 
 The script now emits richer `INFO` logs by default: configuration summary, source start/end, source timings, fallback usage and human-readable TRMNL HTTP diagnostics.
 

@@ -23,15 +23,18 @@ Ce markup attend merge_variables avec la structure produite par le script Python
             <span class="label label--small label--gray">{{ t.data_unavailable }}</span>
           {% endunless %}
 
-          <div class="flex flex--row flex--between flex--center-y gap--small">
-            <div class="flex flex--row gap--small flex--center-y">
+          <div class="flex flex--row flex--between flex--center-y" style="width:100%; justify-content:space-between; align-items:center;">
+            <div class="flex flex--row flex--center-y" style="justify-content:flex-start; align-items:center; gap:0.35rem;">
               {% assign icon_url = "https://trmnl.com/images/plugins/weather/" | append: weather.current.icon | append: ".svg" %}
               <img class="image image-dither w--20 h--20" src="{{ icon_url }}" alt="" />
-              <span class="value value--xlarge value--tnums" style="font-size: 4.25rem; line-height: 1;">{{ weather.current.temperature }}°</span>
+              <span class="value value--xlarge value--tnums" style="font-size: 3rem; line-height: 1;">{{ weather.current.temperature_display }}</span>
             </div>
-            <div class="flex flex--col gap--xsmall flex--center-y" style="margin-left:auto; text-align:right; align-items:flex-end;">
+            <div class="flex flex--col gap--xsmall" style="margin-left:auto; text-align:right; align-items:flex-end; justify-content:flex-end; min-width:8rem;">
               <span class="label label--xsmall label--underline" style="white-space: nowrap;">{{ t.humidity }} {{ weather.current.humidity }}%</span>
-              <span class="label label--xsmall label--underline" style="white-space: nowrap;">{{ t.wind }} {{ weather.current.wind_direction }}</span>
+              <span class="label label--xsmall label--underline flex flex--row" style="white-space: nowrap; width:100%; justify-content:flex-end; gap:0.35rem;">
+                <span>{{ t.wind }} {{ weather.current.wind_speed }} {{ weather.current.wind_speed_unit }}</span>
+                <span>{{ weather.current.wind_direction }}</span>
+              </span>
             </div>
           </div>
 

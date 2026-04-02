@@ -28,8 +28,10 @@ weather:
   city: "Paris"
   latitude: 48.8566
   longitude: 2.3522
-  temperature_unit: celsius   # celsius | fahrenheit
-  wind_speed_unit: kmh        # kmh | ms | mph | kn
+  unit_system: metric         # metric = celsius + km/h | imperial = fahrenheit + mph
+  # Legacy advanced overrides remain supported if needed:
+  # temperature_unit: celsius   # celsius | fahrenheit
+  # wind_speed_unit: kmh        # kmh | mph | ms | kn
 
 finance:
   entries:
