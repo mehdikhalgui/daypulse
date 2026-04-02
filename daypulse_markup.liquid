@@ -1,11 +1,11 @@
 <!--
 TRMNL Private Plugin Markup (Liquid)
 
-Ce markup attend merge_variables avec la structure produite par le script Python du plugin:
-- t: translations (labels)
-- weather: current + forecast
-- finance: indices
-- calendar: days[7]
+Ce markup attend merge_variables avec la structure compacte produite juste avant sérialisation:
+- t: traductions minimales
+- w: météo
+- f: marchés
+- c: agenda
 -->
 
 <div class="layout layout--col layout--top layout--stretch" style="width:100%;">
@@ -16,26 +16,44 @@ Ce markup attend merge_variables avec la structure produite par le script Python
         <!-- Weather -->
         <div class="flex flex--col gap--small outline p--4 h--full" style="width:100%; min-width:0; box-sizing:border-box;">
           <div class="flex flex--row flex--center-x flex--center-y" style="margin-top:-0.2rem;">
-            <span class="title">{{ weather.city }}</span>
+            <span class="title">{{ w.ci }}</span>
           </div>
 
-          {% unless weather.ok %}
-            <span class="label label--small label--gray">{{ t.data_unavailable }}</span>
+          {% unless w.o %}
+            <span class="label label--small label--gray">{{ t.du }}</span>
           {% endunless %}
 
           <div class="grid gap--small" style="width:100%; grid-template-columns:4.6rem minmax(0, 1fr) auto; align-items:center; column-gap:0.5rem;">
             <div class="flex flex--center-x flex--center-y" style="justify-content:flex-start; align-items:center; width:4.6rem;">
-              {% assign icon_url = "https://trmnl.com/images/plugins/weather/" | append: weather.current.icon | append: ".svg" %}
+              {% assign current_icon_name = "wi-cloudy" %}
+              {% case w.c.i %}
+                {% when 0 %}{% assign current_icon_name = "wi-day-sunny" %}
+                {% when 1 %}{% assign current_icon_name = "wi-day-cloudy" %}
+                {% when 2 %}{% assign current_icon_name = "wi-cloudy" %}
+                {% when 3 %}{% assign current_icon_name = "wi-fog" %}
+                {% when 4 %}{% assign current_icon_name = "wi-sprinkle" %}
+                {% when 5 %}{% assign current_icon_name = "wi-rain" %}
+                {% when 6 %}{% assign current_icon_name = "wi-snow" %}
+                {% when 7 %}{% assign current_icon_name = "wi-thunderstorm" %}
+                {% when 8 %}{% assign current_icon_name = "wi-night-clear" %}
+                {% when 9 %}{% assign current_icon_name = "wi-night-alt-cloudy" %}
+                {% when 10 %}{% assign current_icon_name = "wi-night-fog" %}
+                {% when 11 %}{% assign current_icon_name = "wi-night-alt-sprinkle" %}
+                {% when 12 %}{% assign current_icon_name = "wi-night-alt-rain" %}
+                {% when 13 %}{% assign current_icon_name = "wi-night-alt-snow" %}
+                {% when 14 %}{% assign current_icon_name = "wi-night-alt-thunderstorm" %}
+              {% endcase %}
+              {% assign icon_url = "https://trmnl.com/images/plugins/weather/" | append: current_icon_name | append: ".svg" %}
               <img class="image image-dither w--20 h--20" src="{{ icon_url }}" alt="" style="width:4.4rem; height:4.4rem;" />
             </div>
             <div class="flex flex--center-x flex--center-y" style="justify-content:center; align-items:center; text-align:center; min-width:0;">
-              <span class="value value--large value--tnums" style="font-size:3rem; line-height:1;">{{ weather.current.temperature_display }}</span>
+              <span class="value value--large value--tnums" style="font-size:3rem; line-height:1;">{{ w.c.td }}</span>
             </div>
             <div class="flex flex--col gap--xsmall" style="text-align:right; align-items:flex-end; justify-content:flex-end; min-width:8rem;">
-              <span class="label label--underline" style="white-space: nowrap;">{{ t.humidity }} {{ weather.current.humidity }}%</span>
+              <span class="label label--underline" style="white-space: nowrap;">{{ t.h }} {{ w.c.h }}%</span>
               <span class="label label--underline flex flex--row" style="white-space: nowrap; width:100%; justify-content:flex-end; gap:0.35rem;">
-                <span>{{ t.wind }} {{ weather.current.wind_speed }} {{ weather.current.wind_speed_unit }}</span>
-                <span>{{ weather.current.wind_direction }}</span>
+                <span>{{ t.w }} {{ w.c.ws }} {{ w.c.wu }}</span>
+                <span>{{ w.c.wd }}</span>
               </span>
             </div>
           </div>
@@ -43,24 +61,53 @@ Ce markup attend merge_variables avec la structure produite par le script Python
           <div class="flex flex--row flex--center-x" style="width:100%; margin-top:0.15rem; align-items:center; justify-content:center; gap:3rem;">
             <div class="flex flex--row flex--center-y" style="align-items:center; gap:0.35rem;">
               <img class="image image-dither" src="https://trmnl.com/images/plugins/weather/wi-sunrise.svg" alt="" style="width:1.35rem; height:1.35rem;" />
-              <span class="label label--gray">{{ t.sunrise }} {{ weather.current.sunrise_time }}</span>
+              <span class="label label--gray">{{ t.sr }} {{ w.c.sr }}</span>
             </div>
             <div class="flex flex--row flex--center-y" style="align-items:center; gap:0.35rem;">
-              {% assign moon_icon_url = "https://trmnl.com/images/plugins/weather/" | append: weather.current.moon_phase_icon | append: ".svg" %}
+              {% assign moon_icon_name = "wi-moon-alt-new" %}
+              {% case w.c.mi %}
+                {% when 0 %}{% assign moon_icon_name = "wi-moon-alt-new" %}
+                {% when 1 %}{% assign moon_icon_name = "wi-moon-alt-waxing-crescent-3" %}
+                {% when 2 %}{% assign moon_icon_name = "wi-moon-alt-first-quarter" %}
+                {% when 3 %}{% assign moon_icon_name = "wi-moon-alt-waxing-gibbous-3" %}
+                {% when 4 %}{% assign moon_icon_name = "wi-moon-alt-full" %}
+                {% when 5 %}{% assign moon_icon_name = "wi-moon-alt-waning-gibbous-3" %}
+                {% when 6 %}{% assign moon_icon_name = "wi-moon-alt-third-quarter" %}
+                {% when 7 %}{% assign moon_icon_name = "wi-moon-alt-waning-crescent-3" %}
+              {% endcase %}
+              {% assign moon_icon_url = "https://trmnl.com/images/plugins/weather/" | append: moon_icon_name | append: ".svg" %}
               <img class="image image-dither" src="{{ moon_icon_url }}" alt="" style="width:1.35rem; height:1.35rem;" />
-              <span class="label label--gray">{{ t.sunset }} {{ weather.current.sunset_time }}</span>
+              <span class="label label--gray">{{ t.ss }} {{ w.c.ss }}</span>
             </div>
           </div>
 
           <div class="flex flex--col gap--xsmall" style="width:100%; margin-top:0.3rem;">
-            <span class="label label--gray" style="display:block; margin-top:0.15rem;">{{ t.forecast }}</span>
+            <span class="label label--gray" style="display:block; margin-top:0.15rem;">{{ t.fc }}</span>
             <div class="grid grid--cols-5 gap--xsmall" style="grid-template-columns:repeat(5, minmax(0, 1fr));">
-              {% for day in weather.forecast %}
-                {% assign day_icon_url = "https://trmnl.com/images/plugins/weather/" | append: day.icon | append: ".svg" %}
+              {% for day in w.f %}
+                {% assign day_icon_name = "wi-cloudy" %}
+                {% case day.i %}
+                  {% when 0 %}{% assign day_icon_name = "wi-day-sunny" %}
+                  {% when 1 %}{% assign day_icon_name = "wi-day-cloudy" %}
+                  {% when 2 %}{% assign day_icon_name = "wi-cloudy" %}
+                  {% when 3 %}{% assign day_icon_name = "wi-fog" %}
+                  {% when 4 %}{% assign day_icon_name = "wi-sprinkle" %}
+                  {% when 5 %}{% assign day_icon_name = "wi-rain" %}
+                  {% when 6 %}{% assign day_icon_name = "wi-snow" %}
+                  {% when 7 %}{% assign day_icon_name = "wi-thunderstorm" %}
+                  {% when 8 %}{% assign day_icon_name = "wi-night-clear" %}
+                  {% when 9 %}{% assign day_icon_name = "wi-night-alt-cloudy" %}
+                  {% when 10 %}{% assign day_icon_name = "wi-night-fog" %}
+                  {% when 11 %}{% assign day_icon_name = "wi-night-alt-sprinkle" %}
+                  {% when 12 %}{% assign day_icon_name = "wi-night-alt-rain" %}
+                  {% when 13 %}{% assign day_icon_name = "wi-night-alt-snow" %}
+                  {% when 14 %}{% assign day_icon_name = "wi-night-alt-thunderstorm" %}
+                {% endcase %}
+                {% assign day_icon_url = "https://trmnl.com/images/plugins/weather/" | append: day_icon_name | append: ".svg" %}
                 <div class="flex flex--col flex--center-x gap--xsmall">
                   <img class="image image-dither w--8 h--8" src="{{ day_icon_url }}" alt="" style="width:2.65rem; height:2.65rem;" />
-                  <span class="label">{{ day.day_label }}</span>
-                  <span class="label">{{ day.temp_max }}°/{{ day.temp_min }}°</span>
+                  <span class="label">{{ day.d }}</span>
+                  <span class="label">{{ day.x }}°/{{ day.n }}°</span>
                 </div>
               {% endfor %}
             </div>
@@ -69,18 +116,18 @@ Ce markup attend merge_variables avec la structure produite par le script Python
 
         <!-- Markets -->
         <div class="flex flex--col gap--small outline p--4 h--full" style="width:100%; min-width:0; box-sizing:border-box;">
-          {% unless finance.ok %}
-            <span class="label label--small label--gray">{{ t.data_unavailable }}</span>
+          {% unless f.o %}
+            <span class="label label--small label--gray">{{ t.du }}</span>
           {% endunless %}
 
-          {% if finance.indices.size > 0 %}
+          {% if f.i.size > 0 %}
             <table class="table table--xsmall" data-table-limit="true" style="width:100%; table-layout:fixed;">
               <tbody>
-                {% for idx in finance.indices %}
+                {% for idx in f.i %}
                   <tr>
-                    <td><span class="label" data-clamp="1">{{ idx.label }}</span></td>
-                    <td><span class="label label--gray">{{ idx.price }}</span></td>
-                    <td><span class="label">{{ idx.arrow }} {{ idx.change_percent }}%</span></td>
+                    <td><span class="label" data-clamp="1">{{ idx.l }}</span></td>
+                    <td><span class="label label--gray">{{ idx.p }}</span></td>
+                    <td><span class="label">{{ idx.a }} {{ idx.c }}%</span></td>
                   </tr>
                 {% endfor %}
               </tbody>
@@ -96,28 +143,28 @@ Ce markup attend merge_variables avec la structure produite par le script Python
     <div class="pt--gap h--[50cqh]" style="width:100%;">
       <div class="flex flex--col gap--small outline p--4 h--full" style="width:100%; box-sizing:border-box;">
         <div class="grid grid--cols-7 gap--xsmall" style="width:100%; grid-template-columns:repeat(7, minmax(0, 1fr));">
-          {% for day in calendar.days %}
+          {% for day in c.d %}
             <div class="flex flex--col gap--xsmall" style="min-width:0;">
-              {% if day.is_weekend %}
-                <span class="label label--filled rounded--xsmall" style="display:flex; align-items:center; justify-content:center; height:1.3rem; line-height:1; padding:0 0.35rem;"><span style="position:relative; top:1.75px; line-height:1;">{{ day.day_label }}</span></span>
+              {% if day.w %}
+                <span class="label label--filled rounded--xsmall" style="display:flex; align-items:center; justify-content:center; height:1.3rem; line-height:1; padding:0 0.35rem;"><span style="position:relative; top:1.75px; line-height:1;">{{ day.l }}</span></span>
               {% else %}
-                <span class="label label--underline" style="line-height:1.3rem;">{{ day.day_label }}</span>
+                <span class="label label--underline" style="line-height:1.3rem;">{{ day.l }}</span>
               {% endif %}
-              {% if calendar.ok %}
-                {% if day.events.size > 0 %}
-                  {% for ev in day.events %}
-                    <span class="label" data-clamp="1">{{ ev.time_label }} {{ ev.summary }}</span>
+              {% if c.o %}
+                {% if day.e.size > 0 %}
+                  {% for ev in day.e %}
+                    <span class="label" data-clamp="1">{{ ev.t }} {{ ev.s }}</span>
                   {% endfor %}
                 {% else %}
-                  <span class="label label--gray">{{ t.no_events }}</span>
+                  <span class="label label--gray">{{ t.ne }}</span>
                 {% endif %}
               {% endif %}
             </div>
           {% endfor %}
         </div>
-        {% unless calendar.ok %}
+        {% unless c.o %}
           <div class="flex flex--center-x flex--center-y h--full" style="width:100%; flex:1;">
-            <span class="label label--large label--gray">{{ t.data_unavailable }}</span>
+            <span class="label label--large label--gray">{{ t.du }}</span>
           </div>
         {% endunless %}
       </div>

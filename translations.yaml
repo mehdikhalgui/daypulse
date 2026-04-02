@@ -4,7 +4,7 @@ en:
   wind: Wind
   sunrise: Sunrise
   sunset: Sunset
-  forecast: Next 3 days
+  forecast: Next days
   markets: Markets
   calendar: Calendar
   all_day: All day
@@ -21,7 +21,7 @@ fr:
   wind: Vent
   sunrise: Lever
   sunset: Coucher
-  forecast: Prochains 3 jours
+  forecast: Prochains jours
   markets: Marchés
   calendar: Agenda
   all_day: Toute la journée

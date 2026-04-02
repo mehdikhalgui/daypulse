@@ -144,6 +144,146 @@ class MergeVariables(TypedDict):
     calendar: CalendarPayload
     meta: MetaPayload
 
+
+ICON_CODE_MAP = {
+    "wi-day-sunny": 0,
+    "wi-day-cloudy": 1,
+    "wi-cloudy": 2,
+    "wi-fog": 3,
+    "wi-sprinkle": 4,
+    "wi-rain": 5,
+    "wi-snow": 6,
+    "wi-thunderstorm": 7,
+    "wi-night-clear": 8,
+    "wi-night-alt-cloudy": 9,
+    "wi-night-fog": 10,
+    "wi-night-alt-sprinkle": 11,
+    "wi-night-alt-rain": 12,
+    "wi-night-alt-snow": 13,
+    "wi-night-alt-thunderstorm": 14,
+}
+
+
+MOON_ICON_CODE_MAP = {
+    "wi-moon-alt-new": 0,
+    "wi-moon-alt-waxing-crescent-3": 1,
+    "wi-moon-alt-first-quarter": 2,
+    "wi-moon-alt-waxing-gibbous-3": 3,
+    "wi-moon-alt-full": 4,
+    "wi-moon-alt-waning-gibbous-3": 5,
+    "wi-moon-alt-third-quarter": 6,
+    "wi-moon-alt-waning-crescent-3": 7,
+}
+
+
+TRANSLATION_KEYS_FOR_TEMPLATE = (
+    "data_unavailable",
+    "humidity",
+    "wind",
+    "sunrise",
+    "sunset",
+    "forecast",
+    "no_events",
+)
+
+
+TRANSLATION_KEY_MAP = {
+    "data_unavailable": "du",
+    "humidity": "h",
+    "wind": "w",
+    "sunrise": "sr",
+    "sunset": "ss",
+    "forecast": "fc",
+    "no_events": "ne",
+}
+
+
+def _icon_code(icon_name: str) -> int:
+    """Return the compact numeric code for a weather icon name."""
+    return int(ICON_CODE_MAP.get(icon_name, ICON_CODE_MAP["wi-cloudy"]))
+
+
+def _moon_icon_code(icon_name: str) -> int:
+    """Return the compact numeric code for a moon-phase icon name."""
+    return int(MOON_ICON_CODE_MAP.get(icon_name, MOON_ICON_CODE_MAP["wi-moon-alt-new"]))
+
+
+def _compact_translations(translations: Dict[str, str]) -> Dict[str, str]:
+    """Keep only the translation strings actually consumed by the Liquid template."""
+    return {
+        TRANSLATION_KEY_MAP[key]: str(translations.get(key, ""))
+        for key in TRANSLATION_KEYS_FOR_TEMPLATE
+        if key in TRANSLATION_KEY_MAP
+    }
+
+
+def _compact_merge_variables(merge_variables: MergeVariables) -> Dict[str, Any]:
+    """Build the compact payload consumed by TRMNL and preview Liquid."""
+    weather = merge_variables.get("weather", {})
+    weather_current = weather.get("current", {})
+    weather_forecast = list(weather.get("forecast") or [])
+    finance = merge_variables.get("finance", {})
+    finance_indices = list(finance.get("indices") or [])
+    calendar = merge_variables.get("calendar", {})
+    calendar_days = list(calendar.get("days") or [])
+
+    return {
+        "t": _compact_translations(merge_variables.get("t", {})),
+        "w": {
+            "o": bool(weather.get("ok")),
+            "ci": str(weather.get("city", "")),
+            "c": {
+                "td": str(weather_current.get("temperature_display", "—")),
+                "h": weather_current.get("humidity", "—"),
+                "ws": weather_current.get("wind_speed", "—"),
+                "wu": str(weather_current.get("wind_speed_unit", "")),
+                "wd": str(weather_current.get("wind_direction", "—")),
+                "sr": str(weather_current.get("sunrise_time", "—")),
+                "ss": str(weather_current.get("sunset_time", "—")),
+                "mi": _moon_icon_code(str(weather_current.get("moon_phase_icon", "wi-moon-alt-new"))),
+                "i": _icon_code(str(weather_current.get("icon", "wi-cloudy"))),
+            },
+            "f": [
+                {
+                    "d": str(day.get("day_label", "—")),
+                    "i": _icon_code(str(day.get("icon", "wi-cloudy"))),
+                    "x": day.get("temp_max", "—"),
+                    "n": day.get("temp_min", "—"),
+                }
+                for day in weather_forecast
+            ],
+        },
+        "f": {
+            "o": bool(finance.get("ok")),
+            "i": [
+                {
+                    "l": str(index.get("label", "")),
+                    "p": str(index.get("price", "—")),
+                    "c": str(index.get("change_percent", "—")),
+                    "a": str(index.get("arrow", "•")),
+                }
+                for index in finance_indices
+            ],
+        },
+        "c": {
+            "o": bool(calendar.get("ok")),
+            "d": [
+                {
+                    "l": str(day.get("day_label", "")),
+                    "w": bool(day.get("is_weekend")),
+                    "e": [
+                        {
+                            "t": str(event.get("time_label", "")),
+                            "s": str(event.get("summary", "")),
+                        }
+                        for event in list(day.get("events") or [])
+                    ],
+                }
+                for day in calendar_days
+            ],
+        },
+    }
+
 TRMNL_STATUS_MESSAGES = {
     200: "OK - data accepted by TRMNL.",
     400: "Bad request - validate the webhook payload format.",
@@ -461,7 +601,7 @@ def _describe_trmnl_status(status_code: int) -> str:
     return TRMNL_STATUS_MESSAGES.get(status_code, f"Unexpected HTTP status {status_code}.")
 
 
-def _build_trmnl_payload_json(merge_variables: MergeVariables) -> str:
+def _build_trmnl_payload_json(merge_variables: Dict[str, Any]) -> str:
     """Serialize the TRMNL webhook body into compact JSON."""
     return json.dumps({"merge_variables": merge_variables}, ensure_ascii=False, separators=(",", ":"))
 
@@ -1774,36 +1914,37 @@ def main(argv: Optional[List[str]] = None) -> int:
     except Exception:
         pass
 
-    payload_json = _build_trmnl_payload_json(merge_variables)
+    compact_merge_variables = _compact_merge_variables(merge_variables)
+    payload_json = _build_trmnl_payload_json(compact_merge_variables)
     _log_payload_size(payload_json, soft_limit_bytes=payload_soft_limit_bytes)
 
     if args.log_payload:
         LOGGER.info(
             "Full payload JSON:\n%s",
-            json.dumps({"merge_variables": merge_variables}, ensure_ascii=False, indent=2),
+            json.dumps({"merge_variables": compact_merge_variables}, ensure_ascii=False, indent=2),
         )
 
     if LOGGER.isEnabledFor(logging.DEBUG):
         # Avoid spamming huge logs; keep a short preview of the payload.
         payload_preview = json.dumps(
-            {"merge_variables": merge_variables},
+            {"merge_variables": compact_merge_variables},
             ensure_ascii=False,
             separators=(",", ":"),
         )
         LOGGER.debug("Payload JSON preview (first 2000 chars): %s", payload_preview[:2000])
 
     if args.print_payload:
-        print(json.dumps({"merge_variables": merge_variables}, ensure_ascii=False, indent=2))
+        print(json.dumps({"merge_variables": compact_merge_variables}, ensure_ascii=False, indent=2))
 
     if args.preview_html:
-        render_preview_html(args.preview_html, merge_variables, program_name=program_name)
+        render_preview_html(args.preview_html, compact_merge_variables, program_name=program_name)
         LOGGER.info("Wrote preview HTML: %s", args.preview_html)
 
     exit_code = 0
     if args.no_send:
         LOGGER.info("--no-send set; skipping TRMNL POST")
     else:
-        resp = send_to_trmnl(config, webhook_url, merge_variables, timeout_seconds)
+        resp = send_to_trmnl(config, webhook_url, compact_merge_variables, timeout_seconds)
         LOGGER.info("TRMNL response: HTTP %s - %s", resp.status_code, _describe_trmnl_status(resp.status_code))
         if resp.status_code == 429:
             LOGGER.error("TRMNL rate limit hit (429). Consider sending less often.")
