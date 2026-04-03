@@ -59,6 +59,7 @@ class WeatherForecastDay(TypedDict):
 
     day_label: str
     icon: str
+    precip_probability: int | str
     temp_max: int | str
     temp_min: int | str
 
@@ -247,6 +248,7 @@ def _compact_merge_variables(merge_variables: MergeVariables) -> Dict[str, Any]:
                 {
                     "d": str(day.get("day_label", "—")),
                     "i": _icon_code(str(day.get("icon", "wi-cloudy"))),
+                    "pp": day.get("precip_probability", "—"),
                     "x": day.get("temp_max", "—"),
                     "n": day.get("temp_min", "—"),
                 }
@@ -283,6 +285,19 @@ def _compact_merge_variables(merge_variables: MergeVariables) -> Dict[str, Any]:
             ],
         },
     }
+
+
+def _normalize_precip_probability(value: Any) -> int | str:
+    """Hide very low precipitation probabilities and round visible values to tens."""
+    try:
+        precip_value = float(value)
+    except (TypeError, ValueError):
+        return "—"
+
+    if precip_value < 10:
+        return "—"
+
+    return int(((precip_value + 5) // 10) * 10)
 
 TRMNL_STATUS_MESSAGES = {
     200: "OK - data accepted by TRMNL.",
@@ -956,7 +971,7 @@ def fetch_weather(config: Dict[str, Any], lang: str) -> WeatherPayload:
         "temperature_unit": units["temperature_unit"],
         "wind_speed_unit": units["wind_speed_unit"],
         "current": "temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,weather_code,is_day",
-        "daily": "weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset",
+        "daily": "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset",
         "forecast_days": 6,
     }
 
@@ -997,6 +1012,7 @@ def fetch_weather(config: Dict[str, Any], lang: str) -> WeatherPayload:
     wcodes: List[Any] = list(daily.get("weather_code") or [])
     tmax: List[Any] = list(daily.get("temperature_2m_max") or [])
     tmin: List[Any] = list(daily.get("temperature_2m_min") or [])
+    precip_probability_max: List[Any] = list(daily.get("precipitation_probability_max") or [])
     sunrises: List[Any] = list(daily.get("sunrise") or [])
     sunsets: List[Any] = list(daily.get("sunset") or [])
     sunrise_time = _format_iso_time_label(sunrises[0]) if sunrises else "—"
@@ -1018,6 +1034,9 @@ def fetch_weather(config: Dict[str, Any], lang: str) -> WeatherPayload:
             {
                 "day_label": day_label,
                 "icon": _open_meteo_icon(int(wcodes[i]) if wcodes[i] is not None else None),
+                "precip_probability": _normalize_precip_probability(
+                    precip_probability_max[i] if i < len(precip_probability_max) else None
+                ),
                 "temp_max": int(round(float(tmax[i]))) if tmax[i] is not None else "—",
                 "temp_min": int(round(float(tmin[i]))) if tmin[i] is not None else "—",
             }
@@ -1404,11 +1423,11 @@ def _default_weather(config: Dict[str, Any]) -> WeatherPayload:
             "icon": "wi-cloudy",
         },
         "forecast": [
-            {"day_label": "—", "icon": "wi-cloudy", "temp_max": "—", "temp_min": "—"},
-            {"day_label": "—", "icon": "wi-cloudy", "temp_max": "—", "temp_min": "—"},
-            {"day_label": "—", "icon": "wi-cloudy", "temp_max": "—", "temp_min": "—"},
-            {"day_label": "—", "icon": "wi-cloudy", "temp_max": "—", "temp_min": "—"},
-            {"day_label": "—", "icon": "wi-cloudy", "temp_max": "—", "temp_min": "—"},
+            {"day_label": "—", "icon": "wi-cloudy", "precip_probability": "—", "temp_max": "—", "temp_min": "—"},
+            {"day_label": "—", "icon": "wi-cloudy", "precip_probability": "—", "temp_max": "—", "temp_min": "—"},
+            {"day_label": "—", "icon": "wi-cloudy", "precip_probability": "—", "temp_max": "—", "temp_min": "—"},
+            {"day_label": "—", "icon": "wi-cloudy", "precip_probability": "—", "temp_max": "—", "temp_min": "—"},
+            {"day_label": "—", "icon": "wi-cloudy", "precip_probability": "—", "temp_max": "—", "temp_min": "—"},
         ],
     }
 
@@ -1525,6 +1544,7 @@ def build_merge_variables_random(
                 {
                     "day_label": _weekday_label(d, lang),
                     "icon": rng.choice(icon_choices),
+                    "precip_probability": _normalize_precip_probability(rng.randint(0, 100)),
                     "temp_max": tmax,
                     "temp_min": tmin,
                 }

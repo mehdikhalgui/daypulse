@@ -37,6 +37,44 @@ Ce markup attend merge_variables avec la structure compacte produite juste avant
   .daypulse-root .agenda-events .label {
     font-size: 0.98rem !important;
   }
+
+  .daypulse-root .forecast-icon-row {
+    position: relative;
+    width: 100%;
+    height: 3rem;
+  }
+
+  .daypulse-root .forecast-icon-group {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 3rem;
+    height: 3rem;
+    transform: translate(-50%, -50%);
+  }
+
+  .daypulse-root .forecast-icon-group--solo {
+    width: 1.8rem;
+  }
+
+  .daypulse-root .forecast-icon {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 1.8rem;
+    height: 1.8rem;
+    transform: translateY(-50%);
+    display: block;
+  }
+
+  .daypulse-root .forecast-precip {
+    position: absolute;
+    top: 50%;
+    left: 1.95rem;
+    transform: translateY(-50%);
+    line-height: 1;
+    white-space: nowrap;
+  }
 </style>
 
 <div class="layout layout--col layout--top layout--stretch h--full daypulse-root" style="width:100%; height:100%;">
@@ -136,7 +174,14 @@ Ce markup attend merge_variables avec la structure compacte produite juste avant
                 {% endcase %}
                 {% assign day_icon_url = "https://trmnl.com/images/plugins/weather/" | append: day_icon_name | append: ".svg" %}
                 <div class="flex flex--col flex--center-x gap--xsmall">
-                  <img class="image image-dither w--8 h--8" src="{{ day_icon_url }}" alt="" style="width:3rem; height:3rem;" />
+                  <div class="forecast-icon-row">
+                    <div class="forecast-icon-group{% if day.pp == blank or day.pp == "—" %} forecast-icon-group--solo{% endif %}">
+                      <img class="image image-dither forecast-icon" src="{{ day_icon_url }}" alt="" />
+                      {% unless day.pp == blank or day.pp == "—" %}
+                        <span class="label label--small label--gray forecast-precip">{{ day.pp }}%</span>
+                      {% endunless %}
+                    </div>
+                  </div>
                   <span class="label">{{ day.d }}</span>
                   <span class="label">{{ day.x }}°/{{ day.n }}°</span>
                 </div>
