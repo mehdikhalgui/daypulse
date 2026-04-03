@@ -56,6 +56,31 @@ You can use either:
   - Create a service account JSON key.
   - Share your calendar with the service account email.
 
+To discover the available calendar IDs for the configured Google account, run:
+
+```powershell
+python .\daypulse.py --config .\config.yaml --list-calendars
+```
+
+The command prints a JSON array with each calendar `id`, `summary`, `accessRole`, `selected`, `timeZone`, and `primary` flag, then exits without generating a preview or sending a webhook.
+
+DayPulse accepts either a single `google_calendar.calendar_id` or a list in `google_calendar.calendar_ids`. When `calendar_ids` is provided, events from all listed calendars are merged into the same 7-day agenda view.
+
+Example:
+
+```yaml
+google_calendar:
+  mode: oauth
+  timezone: "Europe/Paris"
+  calendar_ids:
+    - "mehdi.khalgui@gmail.com"
+    - "family00755357809671195572@group.calendar.google.com"
+    - "1h2a0q7p8fova5bbjqn8hbbkak@group.calendar.google.com"
+  oauth:
+    credentials_json: "credentials.json"
+    token_json: "token.json"
+```
+
 ## 4) Run
 
 Send data to TRMNL (default):
@@ -88,6 +113,12 @@ Log the full webhook payload before preview/send:
 
 ```powershell
 python .\daypulse.py --config .\config.yaml --log-payload --no-send
+```
+
+List accessible Google Calendar IDs:
+
+```powershell
+python .\daypulse.py --config .\config.yaml --list-calendars
 ```
 
 

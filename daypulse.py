@@ -1182,6 +1182,68 @@ def _build_calendar_service_service_account(service_account_json: str) -> Any:
     return build("calendar", "v3", credentials=creds)
 
 
+def _build_calendar_service_from_config(config: Dict[str, Any]) -> Any:
+    """Build a Google Calendar client from the current configuration."""
+    gcfg = _as_dict(config.get("google_calendar"))
+    mode = str(gcfg.get("mode", "oauth")).strip().lower()
+
+    if mode == "service_account":
+        service_account_json = str(_as_dict(gcfg.get("service_account")).get("json", "")).strip()
+        if not service_account_json:
+            raise ValueError("google_calendar.service_account.json is required for service_account mode")
+        return _build_calendar_service_service_account(service_account_json)
+
+    credentials_json = str(_as_dict(gcfg.get("oauth")).get("credentials_json", "")).strip()
+    token_json = str(_as_dict(gcfg.get("oauth")).get("token_json", "token.json")).strip()
+    if not credentials_json:
+        raise ValueError("google_calendar.oauth.credentials_json is required for oauth mode")
+    return _build_calendar_service_oauth(credentials_json, token_json)
+
+
+def list_google_calendars(config: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """List accessible Google Calendars for the configured account."""
+    service = _build_calendar_service_from_config(config)
+    calendars: List[Dict[str, Any]] = []
+    page_token: Optional[str] = None
+
+    while True:
+        response = service.calendarList().list(pageToken=page_token).execute()
+        for item in response.get("items", []):
+            calendars.append(
+                {
+                    "id": str(item.get("id", "")),
+                    "summary": str(item.get("summary", "")),
+                    "accessRole": str(item.get("accessRole", "")),
+                    "selected": bool(item.get("selected", False)),
+                    "timeZone": str(item.get("timeZone", "")),
+                    "primary": bool(item.get("primary", False)),
+                }
+            )
+        page_token = response.get("nextPageToken")
+        if not page_token:
+            break
+
+    return calendars
+
+
+def _get_configured_calendar_ids(config: Dict[str, Any]) -> List[str]:
+    """Return the configured Google Calendar ids, supporting both single and multiple forms."""
+    gcfg = _as_dict(config.get("google_calendar"))
+    configured_ids = gcfg.get("calendar_ids")
+
+    if isinstance(configured_ids, list):
+        calendar_ids = [str(value).strip() for value in configured_ids if str(value).strip()]
+        if calendar_ids:
+            return calendar_ids
+    elif configured_ids is not None:
+        configured_id = str(configured_ids).strip()
+        if configured_id:
+            return [configured_id]
+
+    legacy_calendar_id = str(gcfg.get("calendar_id", "primary")).strip()
+    return [legacy_calendar_id or "primary"]
+
+
 def fetch_calendar(config: Dict[str, Any], lang: str, *, all_day_label: str) -> CalendarPayload:
     """Fetch calendar events for the next seven days and bucket them by day."""
     gcfg = config.get("google_calendar", {})
@@ -1190,56 +1252,60 @@ def fetch_calendar(config: Dict[str, Any], lang: str, *, all_day_label: str) -> 
     mode = str(gcfg.get("mode", "oauth")).strip().lower()
     tz_name = str(gcfg.get("timezone", "UTC"))
     tz = _get_timezone(tz_name)
-    calendar_id = str(gcfg.get("calendar_id", "primary"))
+    calendar_ids = _get_configured_calendar_ids(config)
     max_events_per_day = int(ccfg.get("max_events_per_day", 3))
-    max_title_length = int(ccfg.get("max_title_length", 32))
 
-    LOGGER.info("Fetching Google Calendar events (%s, calendar=%s, timezone=%s)", mode, calendar_id, tz_name)
-
-    if mode == "service_account":
-        service_account_json = str((gcfg.get("service_account") or {}).get("json", "")).strip()
-        if not service_account_json:
-            raise ValueError("google_calendar.service_account.json is required for service_account mode")
-        service = _build_calendar_service_service_account(service_account_json)
-    else:
-        credentials_json = str((gcfg.get("oauth") or {}).get("credentials_json", "")).strip()
-        token_json = str((gcfg.get("oauth") or {}).get("token_json", "token.json")).strip()
-        if not credentials_json:
-            raise ValueError("google_calendar.oauth.credentials_json is required for oauth mode")
-        service = _build_calendar_service_oauth(credentials_json, token_json)
+    LOGGER.info(
+        "Fetching Google Calendar events (%s, calendars=%s, timezone=%s)",
+        mode,
+        ", ".join(calendar_ids),
+        tz_name,
+    )
+    service = _build_calendar_service_from_config(config)
 
     now = dt.datetime.now(tz=tz)
     time_min = now.isoformat()
     time_max = (now + dt.timedelta(days=7)).isoformat()
 
-    events_result = (
-        service.events()
-        .list(
-            calendarId=calendar_id,
-            timeMin=time_min,
-            timeMax=time_max,
-            singleEvents=True,
-            orderBy="startTime",
-            maxResults=250,
+    events: List[Tuple[int, int, Dict[str, Any]]] = []
+    for calendar_rank, calendar_id in enumerate(calendar_ids):
+        events_result = (
+            service.events()
+            .list(
+                calendarId=calendar_id,
+                timeMin=time_min,
+                timeMax=time_max,
+                singleEvents=True,
+                orderBy="startTime",
+                maxResults=250,
+            )
+            .execute()
         )
-        .execute()
+        calendar_events = events_result.get("items", [])
+        LOGGER.info("[calendar] %s -> %s event(s) returned", calendar_id, len(calendar_events))
+        for event_index, calendar_event in enumerate(calendar_events):
+            events.append((calendar_rank, event_index, calendar_event))
+
+    LOGGER.info(
+        "Calendar API returned %s event(s) across %s calendar(s) for the next 7 days",
+        len(events),
+        len(calendar_ids),
     )
-    events = events_result.get("items", [])
-    LOGGER.info("Calendar API returned %s event(s) for the next 7 days", len(events))
 
     days: List[CalendarDay] = []
-    buckets: Dict[dt.date, List[CalendarEvent]] = {}
+    buckets: Dict[dt.date, List[Tuple[int, int, int, dt.datetime, str, CalendarEvent]]] = {}
     for i in range(7):
         d = (now.date() + dt.timedelta(days=i))
         buckets[d] = []
 
     dropped_events = 0
-    for ev in events:
+    for calendar_rank, event_index, ev in events:
         summary = str(ev.get("summary", ""))
         start = ev.get("start", {})
         start_dt: Optional[dt.datetime] = None
         start_date: Optional[dt.date] = None
         time_label = ""
+        is_all_day = False
 
         if "dateTime" in start:
             # RFC3339; keep simple by parsing with fromisoformat after normalization.
@@ -1258,7 +1324,9 @@ def fetch_calendar(config: Dict[str, Any], lang: str, *, all_day_label: str) -> 
         elif "date" in start:
             try:
                 start_date = dt.date.fromisoformat(str(start["date"]))
-                time_label = all_day_label
+                time_label = ""
+                is_all_day = True
+                start_dt = dt.datetime.combine(start_date, dt.time.min, tzinfo=tz)
             except Exception:
                 LOGGER.debug("[calendar] Event ignored due to invalid all-day date: %s", start.get("date"))
                 dropped_events += 1
@@ -1269,18 +1337,30 @@ def fetch_calendar(config: Dict[str, Any], lang: str, *, all_day_label: str) -> 
             dropped_events += 1
             continue
 
+        event_payload = {
+            "time_label": time_label,
+            "summary": summary,
+        }
         buckets[start_date].append(
-            {
-                "time_label": time_label,
-                "summary": _truncate(summary, max_title_length),
-            }
+            (
+                calendar_rank,
+                0 if is_all_day else 1,
+                event_index,
+                start_dt or dt.datetime.combine(start_date, dt.time.min, tzinfo=tz),
+                summary,
+                event_payload,
+            )
         )
         LOGGER.debug("[calendar] Event bucketed on %s: %s", start_date.isoformat(), summary or "(untitled)")
 
     for i in range(7):
         d = now.date() + dt.timedelta(days=i)
         day_label = f"{_weekday_label(d, lang)} {d.day:02d}"
-        day_events = buckets.get(d, [])[: max(0, max_events_per_day)]
+        sorted_day_events = sorted(
+            buckets.get(d, []),
+            key=lambda item: (item[1], item[0], item[2]) if item[1] == 0 else (item[1], item[3], item[2], item[0], item[4]),
+        )
+        day_events = [item[5] for item in sorted_day_events[: max(0, max_events_per_day)]]
         LOGGER.info("[calendar] %s -> %s event(s)", day_label, len(day_events))
         days.append(
             {
@@ -1293,8 +1373,9 @@ def fetch_calendar(config: Dict[str, Any], lang: str, *, all_day_label: str) -> 
 
     total_bucketed = sum(len(items) for items in buckets.values())
     LOGGER.info(
-        "Calendar OK - %s event(s) in range, %s dropped, max/day=%s",
+        "Calendar OK - %s event(s) in range across %s calendar(s), %s dropped, max/day=%s",
         total_bucketed,
+        len(calendar_ids),
         dropped_events,
         max_events_per_day,
     )
@@ -1543,7 +1624,6 @@ def build_merge_variables_random(
 
         ccfg = config.get("calendar", {})
         max_events_per_day = int(ccfg.get("max_events_per_day", 3))
-        max_title_length = int(ccfg.get("max_title_length", 32))
 
         event_titles = [
             "Standup",
@@ -1568,7 +1648,7 @@ def build_merge_variables_random(
             for _ in range(count):
                 is_all_day = rng.random() < 0.15
                 if is_all_day:
-                    time_label = str(t.get("all_day", "All day"))
+                    time_label = ""
                 else:
                     hour = rng.randint(7, 20)
                     minute = rng.choice([0, 15, 30, 45])
@@ -1577,7 +1657,7 @@ def build_merge_variables_random(
                 evs.append(
                     {
                         "time_label": time_label,
-                        "summary": _truncate(title, max_title_length),
+                        "summary": title,
                     }
                 )
 
@@ -1809,6 +1889,11 @@ Examples:
         help="Print the JSON webhook payload to stdout (merge_variables only).",
     )
     p.add_argument(
+        "--list-calendars",
+        action="store_true",
+        help="List accessible Google Calendar calendar IDs and exit.",
+    )
+    p.add_argument(
         "--log-payload",
         action="store_true",
         help="Log the full JSON webhook payload at INFO level before preview/send.",
@@ -1861,6 +1946,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     LOGGER.info("Translations file: %s", args.translations)
     LOGGER.info("Logging configured: mode=%s level=%s file=%s", log_mode, log_level, log_file or "-")
     LOGGER.debug("Args: %s", vars(args))
+
+    if args.list_calendars:
+        calendars = list_google_calendars(config)
+        LOGGER.info("Google Calendar listing OK - %s calendar(s) found", len(calendars))
+        print(json.dumps(calendars, indent=2, ensure_ascii=False))
+        return 0
 
     translations = _load_yaml(args.translations)
 

@@ -57,7 +57,11 @@ finance:
 google_calendar:
   mode: oauth  # oauth | service_account
   timezone: "Europe/Paris"
-  calendar_id: primary
+  calendar_ids:
+    - primary
+    # - family00755357809671195572@group.calendar.google.com
+  # Legacy single-calendar form remains supported:
+  # calendar_id: primary
   oauth:
     credentials_json: "credentials.json"
     token_json: "token.json"

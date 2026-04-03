@@ -8,7 +8,34 @@ Ce markup attend merge_variables avec la structure compacte produite juste avant
 - c: agenda
 -->
 
-<div class="layout layout--col layout--top layout--stretch h--full" style="width:100%; height:100%;">
+<style>
+  .daypulse-root span.title {
+    font-size: 1.3rem !important;
+    line-height: 1.1 !important;
+  }
+
+  .daypulse-root span.label {
+    font-size: 1.08rem !important;
+    line-height: 1.18 !important;
+  }
+
+  .daypulse-root span.label.label--small {
+    font-size: 0.98rem !important;
+  }
+
+  .daypulse-root span.label.label--large {
+    font-size: 1.3rem !important;
+    line-height: 1.15 !important;
+  }
+
+  .daypulse-root td .label,
+  .daypulse-root .grid .label,
+  .daypulse-root .flex .label {
+    font-size: inherit;
+  }
+</style>
+
+<div class="layout layout--col layout--top layout--stretch h--full daypulse-root" style="width:100%; height:100%;">
   <div class="flex flex--col gap h--full" style="width:100%; min-height:0;">
     <!-- Top half: Weather (left) + Markets (right) -->
     <div style="width:100%; flex:1 1 0; min-height:0;">
@@ -44,10 +71,10 @@ Ce markup attend merge_variables avec la structure compacte produite juste avant
                 {% when 14 %}{% assign current_icon_name = "wi-night-alt-thunderstorm" %}
               {% endcase %}
               {% assign icon_url = "https://trmnl.com/images/plugins/weather/" | append: current_icon_name | append: ".svg" %}
-              <img class="image image-dither w--20 h--20" src="{{ icon_url }}" alt="" style="width:4.4rem; height:4.4rem;" />
+              <img class="image image-dither w--20 h--20" src="{{ icon_url }}" alt="" style="width:4.95rem; height:4.95rem;" />
             </div>
             <div class="flex flex--center-x flex--center-y" style="justify-content:center; align-items:center; text-align:center; min-width:0;">
-              <span class="value value--large value--tnums" style="font-size:3rem; line-height:1;">{{ w.c.td }}</span>
+              <span class="value value--large value--tnums" style="font-size:3.35rem; line-height:1;">{{ w.c.td }}</span>
             </div>
             <div class="flex flex--col gap--xsmall" style="text-align:right; align-items:flex-end; justify-content:flex-end; min-width:8rem;">
               <span class="label label--underline" style="white-space: nowrap;">{{ t.h }} {{ w.c.h }}%</span>
@@ -60,7 +87,7 @@ Ce markup attend merge_variables avec la structure compacte produite juste avant
 
           <div class="flex flex--row flex--center-x" style="width:100%; margin-top:0.15rem; align-items:center; justify-content:center; gap:3rem;">
             <div class="flex flex--row flex--center-y" style="align-items:center; gap:0.35rem;">
-              <img class="image image-dither" src="https://trmnl.com/images/plugins/weather/wi-sunrise.svg" alt="" style="width:1.35rem; height:1.35rem;" />
+              <img class="image image-dither" src="https://trmnl.com/images/plugins/weather/wi-sunrise.svg" alt="" style="width:1.55rem; height:1.55rem;" />
               <span class="label label--gray">{{ t.sr }} {{ w.c.sr }}</span>
             </div>
             <div class="flex flex--row flex--center-y" style="align-items:center; gap:0.35rem;">
@@ -76,7 +103,7 @@ Ce markup attend merge_variables avec la structure compacte produite juste avant
                 {% when 7 %}{% assign moon_icon_name = "wi-moon-alt-waning-crescent-3" %}
               {% endcase %}
               {% assign moon_icon_url = "https://trmnl.com/images/plugins/weather/" | append: moon_icon_name | append: ".svg" %}
-              <img class="image image-dither" src="{{ moon_icon_url }}" alt="" style="width:1.35rem; height:1.35rem;" />
+              <img class="image image-dither" src="{{ moon_icon_url }}" alt="" style="width:1.55rem; height:1.55rem;" />
               <span class="label label--gray">{{ t.ss }} {{ w.c.ss }}</span>
             </div>
           </div>
@@ -105,9 +132,9 @@ Ce markup attend merge_variables avec la structure compacte produite juste avant
                 {% endcase %}
                 {% assign day_icon_url = "https://trmnl.com/images/plugins/weather/" | append: day_icon_name | append: ".svg" %}
                 <div class="flex flex--col flex--center-x gap--xsmall">
-                  <img class="image image-dither w--8 h--8" src="{{ day_icon_url }}" alt="" style="width:2.65rem; height:2.65rem;" />
+                  <img class="image image-dither w--8 h--8" src="{{ day_icon_url }}" alt="" style="width:3rem; height:3rem;" />
                   <span class="label">{{ day.d }}</span>
-                  <span class="label">{{ day.x }}/{{ day.n }}</span>
+                  <span class="label">{{ day.x }}°/{{ day.n }}°</span>
                 </div>
               {% endfor %}
             </div>
@@ -146,18 +173,32 @@ Ce markup attend merge_variables avec la structure compacte produite juste avant
           {% for day in c.d %}
             <div class="flex flex--col gap--xsmall" style="min-width:0;">
               {% if day.w %}
-                <span class="label label--inverted rounded--xsmall" style="display:flex; align-items:center; justify-content:center; height:1.3rem; line-height:1; padding:0 0.35rem;"><span style="position:relative; top:1.75px; line-height:1;">{{ day.l }}</span></span>
+                <span class="label label--inverted rounded--xsmall" style="display:flex; align-items:center; justify-content:center; height:1.45rem; line-height:1; padding:0 0.4rem; position:relative; top:-4px;"><span style="position:relative; top:2px; line-height:1;">{{ day.l }}</span></span>
               {% else %}
-                <span class="label label--underline" style="line-height:1.3rem;">{{ day.l }}</span>
+                <span class="label label--underline" style="line-height:1.45rem;">{{ day.l }}</span>
               {% endif %}
               {% if c.o %}
-                {% if day.e.size > 0 %}
-                  {% for ev in day.e %}
-                    <span class="label" data-clamp="1">{{ ev.t }} {{ ev.s }}</span>
-                  {% endfor %}
-                {% else %}
-                  <span class="label label--gray">{{ t.ne }}</span>
-                {% endif %}
+                <div style="{% if day.w %}margin-top:-6px;{% else %}margin-top:-3px;{% endif %}">
+                  {% if day.e.size > 0 %}
+                    <table class="table table--xsmall" style="width:100%; table-layout:fixed;">
+                      <tbody>
+                        {% for ev in day.e %}
+                          <tr>
+                            <td style="width:100%; padding-top:0.22rem; padding-bottom:0.22rem; vertical-align:middle;">
+                              {% if ev.t != blank %}
+                                <span class="label" style="display:block; white-space:normal; line-height:1.15; overflow-wrap:anywhere; word-break:break-all; text-align:justify;">{{ ev.t }} {{ ev.s }}</span>
+                              {% else %}
+                                <span class="label" style="display:block; white-space:normal; line-height:1.15; overflow-wrap:anywhere; word-break:break-all; text-align:justify;">{{ ev.s }}</span>
+                              {% endif %}
+                            </td>
+                          </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  {% else %}
+                    <span class="label label--gray" style="display:block; margin-top:3px;">{{ t.ne }}</span>
+                  {% endif %}
+                </div>
               {% endif %}
             </div>
           {% endfor %}
