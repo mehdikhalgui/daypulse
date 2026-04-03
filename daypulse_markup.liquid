@@ -33,6 +33,10 @@ Ce markup attend merge_variables avec la structure compacte produite juste avant
   .daypulse-root .flex .label {
     font-size: inherit;
   }
+
+  .daypulse-root .agenda-events .label {
+    font-size: 0.98rem !important;
+  }
 </style>
 
 <div class="layout layout--col layout--top layout--stretch h--full daypulse-root" style="width:100%; height:100%;">
@@ -180,16 +184,12 @@ Ce markup attend merge_variables avec la structure compacte produite juste avant
               {% if c.o %}
                 <div style="{% if day.w %}margin-top:-6px;{% else %}margin-top:-3px;{% endif %}">
                   {% if day.e.size > 0 %}
-                    <table class="table table--xsmall" style="width:100%; table-layout:fixed;">
+                    <table class="table table--xsmall agenda-events" style="width:100%; table-layout:fixed;">
                       <tbody>
                         {% for ev in day.e %}
                           <tr>
                             <td style="width:100%; padding-top:0.22rem; padding-bottom:0.22rem; vertical-align:middle;">
-                              {% if ev.t != blank %}
-                                <span class="label" style="display:block; white-space:normal; line-height:1.15; overflow-wrap:anywhere; word-break:break-all; text-align:justify;">{{ ev.t }} {{ ev.s }}</span>
-                              {% else %}
-                                <span class="label" style="display:block; white-space:normal; line-height:1.15; overflow-wrap:anywhere; word-break:break-all; text-align:justify;">{{ ev.s }}</span>
-                              {% endif %}
+                              <span class="label" style="display:block; white-space:normal; line-height:1.15; overflow-wrap:anywhere; word-break:break-all; text-align:justify;">{% if ev.t != blank %}{{ ev.t }} {% endif %}{{ ev.s }}</span>
                             </td>
                           </tr>
                         {% endfor %}
