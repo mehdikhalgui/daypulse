@@ -745,10 +745,10 @@ def _resolve_weather_units(config: Dict[str, Any]) -> Dict[str, str]:
 
 
 def _format_temperature_display(temperature: int | str, temperature_symbol: str) -> str:
-    """Return a compact temperature string with its unit when available."""
+    """Return a compact temperature string with the degree sign but without the unit letter."""
     if temperature == "—":
         return "—"
-    return f"{temperature}°{temperature_symbol}"
+    return f"{temperature}°"
 
 
 def _format_wind_summary(direction: str, wind_speed: int | str, wind_speed_label: str) -> str:
