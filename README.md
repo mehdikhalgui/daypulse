@@ -76,9 +76,8 @@ google_calendar:
   mode: oauth
   timezone: "Europe/Paris"
   calendar_ids:
-    - "mehdi.khalgui@gmail.com"
-    - "family00755357809671195572@group.calendar.google.com"
-    - "1h2a0q7p8fova5bbjqn8hbbkak@group.calendar.google.com"
+    - "user@gmail.com"
+    - "family@group.calendar.google.com"
   oauth:
     credentials_json: "credentials.json"
     token_json: "token.json"
