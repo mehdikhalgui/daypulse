@@ -15,12 +15,12 @@ Ce markup attend merge_variables avec la structure compacte produite juste avant
   }
 
   .daypulse-root span.label {
-    font-size: 1.08rem !important;
+    font-size: 1.1rem !important;
     line-height: 1.18 !important;
   }
 
   .daypulse-root span.label.label--small {
-    font-size: 0.98rem !important;
+    font-size: 1.1rem !important;
   }
 
   .daypulse-root span.label.label--large {
@@ -61,8 +61,8 @@ Ce markup attend merge_variables avec la structure compacte produite juste avant
     position: absolute;
     top: 50%;
     left: 0;
-    width: 1.8rem;
-    height: 1.8rem;
+    width: 2.1rem;
+    height: 2.1rem;
     transform: translateY(-50%);
     display: block;
   }
@@ -74,6 +74,13 @@ Ce markup attend merge_variables avec la structure compacte produite juste avant
     transform: translateY(-50%);
     line-height: 1;
     white-space: nowrap;
+  }
+
+  .daypulse-root .forecast-heading {
+    display: block;
+    line-height: 1.28 !important;
+    padding-bottom: 0.25rem;
+    overflow: visible;
   }
 </style>
 
@@ -130,7 +137,7 @@ Ce markup attend merge_variables avec la structure compacte produite juste avant
           <div class="flex flex--row flex--center-x" style="width:100%; margin-top:0.15rem; align-items:center; justify-content:center; gap:3rem;">
             <div class="flex flex--row flex--center-y" style="align-items:center; gap:0.35rem;">
               <img class="image image-dither" src="https://trmnl.com/images/plugins/weather/wi-sunrise.svg" alt="" style="width:1.55rem; height:1.55rem;" />
-              <span class="label label--gray">{{ t.sr }} {{ w.c.sr }}</span>
+              <span class="label label--gray" style="margin-top:0.3rem;">{{ t.sr }} {{ w.c.sr }}</span>
             </div>
             <div class="flex flex--row flex--center-y" style="align-items:center; gap:0.35rem;">
               {% assign moon_icon_name = "wi-moon-alt-new" %}
@@ -146,12 +153,12 @@ Ce markup attend merge_variables avec la structure compacte produite juste avant
               {% endcase %}
               {% assign moon_icon_url = "https://trmnl.com/images/plugins/weather/" | append: moon_icon_name | append: ".svg" %}
               <img class="image image-dither" src="{{ moon_icon_url }}" alt="" style="width:1.55rem; height:1.55rem;" />
-              <span class="label label--gray">{{ t.ss }} {{ w.c.ss }}</span>
+              <span class="label label--gray" style="margin-top:0.3rem;">{{ t.ss }} {{ w.c.ss }}</span>
             </div>
           </div>
 
           <div class="flex flex--col gap--xsmall" style="width:100%; margin-top:0.3rem;">
-            <span class="label label--gray" style="display:block; margin-top:0.15rem;">{{ t.fc }}</span>
+            <span class="label label--gray forecast-heading" style="margin-top:0.05rem;">{{ t.fc }}</span>
             <div class="grid grid--cols-5 gap--xsmall" style="grid-template-columns:repeat(5, minmax(0, 1fr));">
               {% for day in w.f %}
                 {% assign day_icon_name = "wi-cloudy" %}
@@ -192,25 +199,27 @@ Ce markup attend merge_variables avec la structure compacte produite juste avant
 
         <!-- Markets -->
         <div class="flex flex--col gap--small label--outline p--4 h--full" style="width:100%; min-width:0; box-sizing:border-box;">
-          {% unless f.o %}
-            <span class="label label--small label--gray">{{ t.du }}</span>
-          {% endunless %}
+          <div class="flex flex--col gap--small" style="margin-top:-0.3rem;">
+            {% unless f.o %}
+              <span class="label label--small label--gray">{{ t.du }}</span>
+            {% endunless %}
 
-          {% if f.i.size > 0 %}
-            <table class="table table--xsmall" data-table-limit="true" style="width:100%; table-layout:fixed;">
-              <tbody>
-                {% for idx in f.i %}
-                  <tr>
-                    <td style="width:41%;"><span class="label" data-clamp="1">{{ idx.l }}</span></td>
-                    <td style="width:32%; text-align:left;"><span class="label label--gray" style="display:block; text-align:left;">{{ idx.p }}</span></td>
-                    <td style="width:27%; text-align:left;"><span class="label" style="display:block; text-align:left;">{{ idx.a }} {{ idx.c }}%</span></td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          {% else %}
-            <span class="label label--small label--gray">—</span>
-          {% endif %}
+            {% if f.i.size > 0 %}
+                <table class="table table--xsmall" style="width:100%; table-layout:fixed; border-collapse:separate; border-spacing:0 0.12rem;">
+                <tbody>
+                  {% for idx in f.i %}
+                    <tr>
+                          <td style="width:41%; vertical-align:middle;"><span class="label" data-clamp="1">{{ idx.l }}</span></td>
+                          <td style="width:32%; text-align:left; vertical-align:middle;"><span class="label label--gray" style="display:block; text-align:left;">{{ idx.p }}</span></td>
+                          <td style="width:27%; text-align:left; vertical-align:middle;"><span class="label" style="display:block; text-align:left;">{{ idx.a }} {{ idx.c }}%</span></td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            {% else %}
+              <span class="label label--small label--gray">—</span>
+            {% endif %}
+          </div>
         </div>
       </div>
     </div>

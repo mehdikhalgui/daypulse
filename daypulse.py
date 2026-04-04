@@ -288,7 +288,7 @@ def _compact_merge_variables(merge_variables: MergeVariables) -> Dict[str, Any]:
 
 
 def _normalize_precip_probability(value: Any) -> int | str:
-    """Hide very low precipitation probabilities and round visible values to tens."""
+    """Hide very low precipitation probabilities and round visible values to 5% steps."""
     try:
         precip_value = float(value)
     except (TypeError, ValueError):
@@ -297,7 +297,10 @@ def _normalize_precip_probability(value: Any) -> int | str:
     if precip_value < 10:
         return "—"
 
-    return int(((precip_value + 5) // 10) * 10)
+    if precip_value > 90:
+        return 100
+
+    return int(((precip_value + 2.5) // 5) * 5)
 
 TRMNL_STATUS_MESSAGES = {
     200: "OK - data accepted by TRMNL.",
