@@ -683,17 +683,6 @@ def _get_timezone(tz_name: str) -> dt.tzinfo:
     return timezone
 
 
-def _truncate(text: str, max_len: int) -> str:
-    """Truncate text to a maximum length while preserving a readable ellipsis suffix."""
-    text = (text or "").strip()
-    truncated = text[: max(0, max_len - 1)].rstrip() + "…"
-    if max_len <= 0:
-        truncated = ""
-    elif len(text) <= max_len:
-        truncated = text
-    return truncated
-
-
 def _weekday_label(date_obj: dt.date, lang: str) -> str:
     """Return a compact weekday label in the configured language."""
     # Abbreviations tuned for compact 7-column calendar.

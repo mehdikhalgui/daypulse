@@ -10,6 +10,8 @@ This project (DayPulse) generates data (Nominatim + Open-Meteo + yfinance + Goog
 It also supports generating a local preview HTML so you can see what will render on the device.
 The weather block uses TRMNL hosted weather icons, including night variants when Open-Meteo reports that the current timestep is after dark, and displays local sunrise/sunset times from Open-Meteo.
 
+![DayPulse screenshot](screenshot.png)
+
 ## 1) TRMNL setup
 
 1. Create a **Private Plugin** in your TRMNL account.

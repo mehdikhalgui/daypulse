@@ -7,7 +7,7 @@
 # - For Google Calendar you can use either OAuth (interactive) or a Service Account.
 
 general:
-  language: fr   # fr | en
+  language: en   # fr | en
   log:
     mode: console  # console | file | both | none
     level: INFO
@@ -25,13 +25,13 @@ trmnl:
   payload_soft_limit_bytes: 2048
 
 weather:
-  address: "Paris, France"
-  unit_system: metric         # metric = celsius + km/h | imperial = fahrenheit + mph
+  address: "San Francisco, CA, USA"
+  unit_system: imperial       # metric = celsius + km/h | imperial = fahrenheit + mph
   # The UI still shows a city label resolved from Nominatim.
   # Legacy fallback remains supported if needed:
-  # city: "Paris"
-  # latitude: 48.8566
-  # longitude: 2.3522
+  # city: "San Francisco"
+  # latitude: 37.7749
+  # longitude: -122.4194
   # Legacy advanced overrides remain supported if needed:
   # temperature_unit: celsius   # celsius | fahrenheit
   # wind_speed_unit: kmh        # kmh | mph | ms | kn
@@ -39,24 +39,41 @@ weather:
 finance:
   entries:
     - symbol: "^FCHI"
-      label: "CAC 40"
+      label: "CAC 40 🇫🇷"
       show_currency: false
-    - symbol: "XAUEUR=X"
-      label: "Gold"
-      currency: "EUR"
-      show_currency: true
-    - symbol: "AI.PA"
-      label: "Air Liquide"
-      currency: "EUR"
-      show_currency: true
+    - symbol: "^GSPC"
+      label: "S&P 500 🇺🇸"
+      show_currency: false
+    - symbol: "^DJI"
+      label: "Dow Jones 🇺🇸"
+      show_currency: false
+    - symbol: "^N225"
+      label: "Nikkei 225 🇯🇵"
+      show_currency: false
     - symbol: "NVDA"
       label: "Nvidia"
+      currency: "USD"
+      show_currency: true
+    - symbol: "AAPL"
+      label: "Apple"
+      currency: "USD"
+      show_currency: true
+    - symbol: "MSFT"
+      label: "Microsoft"
+      currency: "USD"
+      show_currency: true
+    - symbol: "GC=F"
+      label: "GOLD"
+      currency: "USD"
+      show_currency: true
+    - symbol: "BZ=F"
+      label: "Brent Oil"
       currency: "USD"
       show_currency: true
 
 google_calendar:
   mode: oauth  # oauth | service_account
-  timezone: "Europe/Paris"
+  timezone: "America/Los_Angeles"
   calendar_ids:
     - primary
     # - family00755357809671195572@group.calendar.google.com
