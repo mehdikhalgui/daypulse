@@ -9,9 +9,11 @@
 general:
   language: en   # fr | en
   log:
-    mode: console  # console | file | both | none
-    level: INFO
+    mode: file  # console | file | both | none
+    level: WARNING
     file: trmnl_dashboard.log
+    max_bytes: 1048576   # 1 MiB per log file before rotation
+    backup_count: 5      # keep up to 5 rotated log files
   network:
     request_timeout_seconds: 20
     max_retries: 3

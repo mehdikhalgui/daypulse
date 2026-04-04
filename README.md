@@ -36,6 +36,7 @@ Translations live in [translations.yaml](translations.yaml). Set `general.langua
 Optional additions in the YAML config:
 
 - `general.network.request_timeout_seconds`, `max_retries`, `retry_delay_seconds`, `retry_backoff`, `retry_statuses`
+- `general.log.mode`, `level`, `file`, `max_bytes`, `backup_count` to control file/console logging and log rotation
 - `trmnl.payload_soft_limit_bytes` to tune the payload-size warning threshold
 - `weather.address` to geocode a postal address via Nominatim and automatically resolve the city name shown in the UI
 - `weather.unit_system` to switch between traditional unit sets: `metric` (`°C` + `km/h`) or `imperial` (`°F` + `mph`)
@@ -43,7 +44,7 @@ Optional additions in the YAML config:
 
 For weather, `metric` is the default and matches the usual European convention. `imperial` follows the common US convention. The recommended setup is now `weather.address`; the script geocodes it with Nominatim, uses the resulting coordinates for Open-Meteo, and keeps showing a city label in the UI. Legacy `weather.city`, `weather.latitude`, `weather.longitude`, `weather.temperature_unit`, and `weather.wind_speed_unit` remain supported for advanced or fallback cases.
 
-The script now emits richer `INFO` logs by default: configuration summary, source start/end, source timings, fallback usage and human-readable TRMNL HTTP diagnostics.
+By default, running the script without CLI log overrides writes only `WARNING` and above to the configured log file, with optional size-based rotation via `general.log.max_bytes` and `general.log.backup_count`.
 
 ### Google Calendar authentication
 
@@ -89,6 +90,9 @@ Send data to TRMNL (default):
 
 
 ```powershell
+python .\daypulse.py
+
+# Equivalent explicit form
 python .\daypulse.py --config .\config.yaml
 ```
 
@@ -96,7 +100,10 @@ Preview only (no POST):
 
 
 ```powershell
-python .\daypulse.py --config .\config.yaml --no-send --preview-html .\preview.html
+python .\daypulse.py --config .\myconfig.yaml --no-send --preview-html .\preview.html
+
+# Preview with console logs enabled
+.\daypulse.py --config .\myconfig.yaml --log-mode console --log-level INFO --no-send --preview-html .\preview.html
 ```
 
 Random test mode (no external API calls):
@@ -104,23 +111,23 @@ Random test mode (no external API calls):
 
 ```powershell
 # Reproducible random output (same seed => same screen)
-python .\daypulse.py --config .\config.yaml --test-random --test-seed 123 --no-send --preview-html .\preview.html
+python .\daypulse.py --config .\myconfig.yaml --test-random --test-seed 123 --no-send --preview-html .\preview.html
 
 # Increase or decrease simulated failures per block (0..1)
-python .\daypulse.py --config .\config.yaml --test-random --test-failure-rate 0.5 --no-send --preview-html .\preview.html
+python .\daypulse.py --config .\myconfig.yaml --test-random --test-failure-rate 0.5 --no-send --preview-html .\preview.html
 ```
 
 Log the full webhook payload before preview/send:
 
 
 ```powershell
-python .\daypulse.py --config .\config.yaml --log-payload --no-send
+python .\daypulse.py --config .\myconfig.yaml --log-payload --no-send
 ```
 
 List accessible Google Calendar IDs:
 
 ```powershell
-python .\daypulse.py --config .\config.yaml --list-calendars
+python .\daypulse.py --config .\myconfig.yaml --list-calendars
 ```
 
 

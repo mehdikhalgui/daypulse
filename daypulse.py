@@ -8,6 +8,7 @@ import os
 import random
 import sys
 import time
+from logging.handlers import RotatingFileHandler
 from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, TypedDict
 
 import requests
@@ -649,7 +650,25 @@ def _log_payload_size(payload_json: str, *, soft_limit_bytes: int = TRMNL_PAYLOA
     return payload_size
 
 
-def _setup_logging(mode: str, level: str, log_file: Optional[str]) -> None:
+def _resolve_positive_int(value: Any, default: int, *, minimum: int = 1) -> int:
+    """Parse a positive integer configuration value with a safe fallback."""
+    try:
+        parsed = int(value)
+        if parsed >= minimum:
+            return parsed
+    except (TypeError, ValueError):
+        pass
+    return default
+
+
+def _setup_logging(
+    mode: str,
+    level: str,
+    log_file: Optional[str],
+    *,
+    max_bytes: int = 0,
+    backup_count: int = 0,
+) -> None:
     """Configure console and file logging according to the selected mode."""
     handlers: List[logging.Handler] = []
 
@@ -658,7 +677,20 @@ def _setup_logging(mode: str, level: str, log_file: Optional[str]) -> None:
     if mode in {"file", "both"}:
         if not log_file:
             raise ValueError("log.file must be set when log mode is file/both")
-        handlers.append(logging.FileHandler(log_file, encoding="utf-8"))
+        log_dir = os.path.dirname(os.path.abspath(log_file))
+        if log_dir:
+            os.makedirs(log_dir, exist_ok=True)
+        if max_bytes > 0 and backup_count > 0:
+            handlers.append(
+                RotatingFileHandler(
+                    log_file,
+                    maxBytes=max_bytes,
+                    backupCount=backup_count,
+                    encoding="utf-8",
+                )
+            )
+        else:
+            handlers.append(logging.FileHandler(log_file, encoding="utf-8"))
 
     if mode == "none":
         logging.basicConfig(level=logging.CRITICAL)
@@ -1869,7 +1901,7 @@ def parse_args(argv: Optional[List[str]] = None, *, program_name: Optional[str] 
     epilog = f"""
 Examples:
   # Default: fetch data and POST to TRMNL
-  python {resolved_program_name} --config config.yaml
+    python {resolved_program_name}
 
   # Preview only (no send)
   python {resolved_program_name} --config config.yaml --no-send --preview-html preview.html
@@ -1884,7 +1916,11 @@ Examples:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=epilog,
     )
-    p.add_argument("--config", required=True, help="Path to YAML config file.")
+    p.add_argument(
+        "--config",
+        default="config.yaml",
+        help="Path to YAML config file (default: config.yaml).",
+    )
     p.add_argument(
         "--translations",
         default="translations.yaml",
@@ -1916,7 +1952,7 @@ Examples:
         choices=["console", "file", "both", "none"],
         help="Override config general.log.mode.",
     )
-    p.add_argument("--log-level", help="Override config general.log.level (e.g. INFO, DEBUG).")
+    p.add_argument("--log-level", help="Override config general.log.level (e.g. CRITICAL, ERROR, WARNING, INFO, DEBUG, NOTSET).")
     p.add_argument("--log-file", help="Override config general.log.file.")
 
     p.add_argument(
@@ -1948,15 +1984,30 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     general = config.get("general", {})
     log_cfg = (general.get("log") or {}) if isinstance(general, dict) else {}
-    log_mode = str(args.log_mode or log_cfg.get("mode", "console")).strip().lower()
-    log_level = str(args.log_level or log_cfg.get("level", "INFO")).strip().upper()
+    log_mode = str(args.log_mode or log_cfg.get("mode", "file")).strip().lower()
+    log_level = str(args.log_level or log_cfg.get("level", "WARNING")).strip().upper()
     log_file = str(args.log_file or log_cfg.get("file", "")).strip() or None
-    _setup_logging(log_mode, log_level, log_file)
+    log_max_bytes = _resolve_positive_int(log_cfg.get("max_bytes", 0), 0, minimum=0)
+    log_backup_count = _resolve_positive_int(log_cfg.get("backup_count", 0), 0, minimum=0)
+    _setup_logging(
+        log_mode,
+        log_level,
+        log_file,
+        max_bytes=log_max_bytes,
+        backup_count=log_backup_count,
+    )
 
     LOGGER.info("Script start")
     LOGGER.info("Configuration loaded: %s", args.config)
     LOGGER.info("Translations file: %s", args.translations)
-    LOGGER.info("Logging configured: mode=%s level=%s file=%s", log_mode, log_level, log_file or "-")
+    LOGGER.info(
+        "Logging configured: mode=%s level=%s file=%s max_bytes=%s backup_count=%s",
+        log_mode,
+        log_level,
+        log_file or "-",
+        log_max_bytes,
+        log_backup_count,
+    )
     LOGGER.debug("Args: %s", vars(args))
 
     if args.list_calendars:
