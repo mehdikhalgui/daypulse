@@ -32,10 +32,12 @@ pip install -r requirements.txt
 Start from [config.example.yaml](config.example.yaml) and create your own `config.yaml`.
 
 Translations live in [translations.yaml](translations.yaml). Set `general.language` to `fr` or `en`.
+You can also pin file locations in `general.paths.translations_yaml` and `general.paths.markup_liquid`.
 
 Optional additions in the YAML config:
 
 - `general.network.request_timeout_seconds`, `max_retries`, `retry_delay_seconds`, `retry_backoff`, `retry_statuses`
+- `general.paths.translations_yaml`, `markup_liquid` to configure the translation YAML and Liquid template paths
 - `general.log.mode`, `level`, `file`, `max_bytes`, `backup_count` to control file/console logging and log rotation
 - `trmnl.payload_soft_limit_bytes` to tune the payload-size warning threshold
 - `weather.address` to geocode a postal address via Nominatim and automatically resolve the city name shown in the UI

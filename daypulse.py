@@ -353,6 +353,50 @@ def _as_dict(value: Any) -> Dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
+def _resolve_path(path: str, *, base_dir: Optional[str] = None) -> str:
+    """Resolve a possibly relative path, optionally against a specific base directory."""
+    normalized_path = str(path).strip()
+    if not normalized_path:
+        return ""
+    if os.path.isabs(normalized_path) or not base_dir:
+        return normalized_path
+    return os.path.normpath(os.path.join(base_dir, normalized_path))
+
+
+def _get_general_paths_config(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Return the optional general.paths mapping from the config."""
+    general_cfg = _as_dict(config.get("general"))
+    return _as_dict(general_cfg.get("paths"))
+
+
+def _get_translations_path(config: Dict[str, Any], cli_path: Optional[str], *, config_dir: str) -> str:
+    """Resolve the translations YAML path from CLI override or config."""
+    if cli_path:
+        return _resolve_path(cli_path)
+
+    paths_cfg = _get_general_paths_config(config)
+    configured_path = str(paths_cfg.get("translations_yaml", "")).strip()
+    if configured_path:
+        return _resolve_path(configured_path, base_dir=config_dir)
+    return _resolve_path("translations.yaml", base_dir=config_dir)
+
+
+def _get_markup_path(config: Dict[str, Any], cli_path: Optional[str], *, config_dir: str, program_name: str) -> str:
+    """Resolve the Liquid markup path from CLI override, config, or default script-based lookup."""
+    if cli_path:
+        return _resolve_path(cli_path)
+
+    paths_cfg = _get_general_paths_config(config)
+    configured_path = str(paths_cfg.get("markup_liquid", "")).strip()
+    if configured_path:
+        resolved_configured_path = _resolve_path(configured_path, base_dir=config_dir)
+        if os.path.exists(resolved_configured_path):
+            return resolved_configured_path
+        raise FileNotFoundError(f"Configured Liquid markup file not found: {resolved_configured_path}")
+
+    return _resolve_markup_path(program_name)
+
+
 def _get_network_config(config: Dict[str, Any]) -> NetworkConfig:
     """Extract network retry and timeout settings from the global configuration."""
     general_cfg = _as_dict(config.get("general"))
@@ -1871,7 +1915,13 @@ def _build_preview_document(rendered_markup: str) -> str:
 """
 
 
-def render_preview_html(output_path: str, merge_variables: Dict[str, Any], *, program_name: str) -> None:
+def render_preview_html(
+    output_path: str,
+    merge_variables: Dict[str, Any],
+    *,
+    program_name: str,
+    markup_path: Optional[str] = None,
+) -> None:
     """Render a standalone HTML preview directly from the plugin Liquid template."""
     try:
         from liquid import Environment as LiquidEnvironment
@@ -1882,9 +1932,9 @@ def render_preview_html(output_path: str, merge_variables: Dict[str, Any], *, pr
             "Install dependencies from requirements.txt."
         ) from exc
 
-    markup_path = _resolve_markup_path(program_name)
-    env = LiquidEnvironment(loader=LiquidFileSystemLoader(os.path.dirname(markup_path)))
-    template = env.get_template(os.path.basename(markup_path))
+    resolved_markup_path = markup_path or _resolve_markup_path(program_name)
+    env = LiquidEnvironment(loader=LiquidFileSystemLoader(os.path.dirname(resolved_markup_path)))
+    template = env.get_template(os.path.basename(resolved_markup_path))
     rendered_markup = template.render(**merge_variables)
     html = _build_preview_document(rendered_markup)
     with open(output_path, "w", encoding="utf-8") as f:
@@ -1923,8 +1973,11 @@ Examples:
     )
     p.add_argument(
         "--translations",
-        default="translations.yaml",
-        help="Path to translations YAML (default: translations.yaml).",
+        help="Path to translations YAML (overrides general.paths.translations_yaml).",
+    )
+    p.add_argument(
+        "--markup",
+        help="Path to Liquid markup template (overrides general.paths.markup_liquid).",
     )
     p.add_argument("--no-send", action="store_true", help="Do not POST to TRMNL.")
     p.add_argument(
@@ -1980,7 +2033,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     args = parse_args(argv, program_name=program_name)
 
     started = dt.datetime.now(dt.timezone.utc)
-    config = _load_yaml(args.config)
+    config_path = os.path.abspath(args.config)
+    config_dir = os.path.dirname(config_path)
+    config = _load_yaml(config_path)
+    translations_path = _get_translations_path(config, args.translations, config_dir=config_dir)
 
     general = config.get("general", {})
     log_cfg = (general.get("log") or {}) if isinstance(general, dict) else {}
@@ -1998,8 +2054,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
 
     LOGGER.info("Script start")
-    LOGGER.info("Configuration loaded: %s", args.config)
-    LOGGER.info("Translations file: %s", args.translations)
+    LOGGER.info("Configuration loaded: %s", config_path)
+    LOGGER.info("Translations file: %s", translations_path)
     LOGGER.info(
         "Logging configured: mode=%s level=%s file=%s max_bytes=%s backup_count=%s",
         log_mode,
@@ -2016,7 +2072,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(json.dumps(calendars, indent=2, ensure_ascii=False))
         return 0
 
-    translations = _load_yaml(args.translations)
+    translations = _load_yaml(translations_path)
 
     trmnl_cfg = config.get("trmnl", {})
     webhook_url = str(trmnl_cfg.get("webhook_url", "")).strip()
@@ -2091,7 +2147,14 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(json.dumps({"merge_variables": compact_merge_variables}, ensure_ascii=False, indent=2))
 
     if args.preview_html:
-        render_preview_html(args.preview_html, compact_merge_variables, program_name=program_name)
+        markup_path = _get_markup_path(config, args.markup, config_dir=config_dir, program_name=program_name)
+        LOGGER.info("Liquid markup file: %s", markup_path)
+        render_preview_html(
+            args.preview_html,
+            compact_merge_variables,
+            program_name=program_name,
+            markup_path=markup_path,
+        )
         LOGGER.info("Wrote preview HTML: %s", args.preview_html)
 
     exit_code = 0

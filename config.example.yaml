@@ -8,6 +8,9 @@
 
 general:
   language: en   # fr | en
+  paths:
+    translations_yaml: "translations.yaml"
+    markup_liquid: "daypulse_markup.liquid"
   log:
     mode: file  # console | file | both | none
     level: WARNING
