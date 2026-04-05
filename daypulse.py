@@ -455,15 +455,6 @@ def _get_finance_entries(config: Dict[str, Any]) -> List[FinanceConfigEntry]:
     return entries
 
 
-def _get_finance_currency_map(config: Dict[str, Any]) -> Dict[str, str]:
-    """Read optional currency overrides for finance tickers."""
-    return {
-        entry["symbol"]: entry["currency"]
-        for entry in _get_finance_entries(config)
-        if entry.get("currency")
-    }
-
-
 def _retry_sleep_seconds(retry_delay_seconds: float, retry_backoff: float, attempt: int) -> float:
     """Compute the wait time before the next retry attempt."""
     return retry_delay_seconds * (retry_backoff ** max(0, attempt - 1))
@@ -506,14 +497,15 @@ def _request_with_retry(
                 )
                 time.sleep(wait_seconds)
                 continue
+            last_exc = None
             response_to_return = response
             break
         except requests.RequestException as exc:
+            LOGGER.warning("%s failed on attempt %s/%s: %s", operation, attempt, max_retries, exc)
             last_exc = exc
             if attempt >= max_retries:
                 break
             wait_seconds = _retry_sleep_seconds(retry_delay_seconds, retry_backoff, attempt)
-            LOGGER.warning("%s failed on attempt %s/%s: %s", operation, attempt, max_retries, exc)
             LOGGER.info("Retrying %s in %.1fs", operation, wait_seconds)
             time.sleep(wait_seconds)
 
@@ -567,15 +559,6 @@ def _resolve_translations(translations: Dict[str, Any], lang: str) -> Dict[str, 
     merged = {str(key): str(value) for key, value in {**en_t, **selected}.items()}
     LOGGER.info("Translations ready for language '%s' (%s keys)", lang, len(merged))
     return merged
-
-
-def _get_finance_label_map(config: Dict[str, Any]) -> Dict[str, str]:
-    """Read optional display-label overrides for finance tickers."""
-    return {
-        entry["symbol"]: entry["label"]
-        for entry in _get_finance_entries(config)
-        if entry.get("label")
-    }
 
 
 def _resolve_finance_label(symbol: str, configured_label: Optional[str], info: Any) -> str:
@@ -654,7 +637,7 @@ def _run_source(
     if error is None:
         LOGGER.info("[%s] Success in %.2fs", name, elapsed)
     else:
-        LOGGER.warning("[%s] Failed in %.2fs: %s", name, elapsed, error)
+        LOGGER.error("[%s] Failed in %.2fs: %s", name, elapsed, error)
         LOGGER.info("[%s] Fallback data applied", name)
     return result, error, elapsed
 
