@@ -534,11 +534,11 @@ def _run_with_retries(
             result = func(attempt)
             break
         except Exception as exc:
+            LOGGER.warning("%s failed on attempt %s/%s: %s", operation, attempt, max_retries, exc)
             last_exc = exc
             if attempt >= max_retries:
                 break
             wait_seconds = _retry_sleep_seconds(retry_delay_seconds, retry_backoff, attempt)
-            LOGGER.warning("%s failed on attempt %s/%s: %s", operation, attempt, max_retries, exc)
             LOGGER.info("Retrying %s in %.1fs", operation, wait_seconds)
             time.sleep(wait_seconds)
     if last_exc is not None:
@@ -698,6 +698,7 @@ def _setup_logging(
 ) -> None:
     """Configure console and file logging according to the selected mode."""
     handlers: List[logging.Handler] = []
+    logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 
     if mode in {"console", "both"}:
         handlers.append(logging.StreamHandler(sys.stdout))
