@@ -397,18 +397,26 @@ def _get_markup_path(config: Dict[str, Any], cli_path: Optional[str], *, config_
     return _resolve_markup_path(program_name)
 
 
-def _get_network_config(config: Dict[str, Any]) -> NetworkConfig:
-    """Extract network retry and timeout settings from the global configuration."""
-    general_cfg = _as_dict(config.get("general"))
-    network_cfg = _as_dict(general_cfg.get("network"))
+def _get_network_config(config: Dict[str, Any], section: Optional[str] = None) -> NetworkConfig:
+    """Extract retry and timeout settings for one section, with legacy global fallback."""
+    section_cfg = _as_dict(config.get(section)) if section else {}
+    network_cfg = _as_dict(section_cfg.get("network"))
+    if not network_cfg:
+        general_cfg = _as_dict(config.get("general"))
+        network_cfg = _as_dict(general_cfg.get("network"))
     retry_statuses = list(network_cfg.get("retry_statuses") or [429, 500, 502, 503, 504])
     return {
         "request_timeout_seconds": int(network_cfg.get("request_timeout_seconds", 15)),
-        "max_retries": max(1, int(network_cfg.get("max_retries", 3))),
+        "max_retries": max(0, int(network_cfg.get("max_retries", 3))),
         "retry_delay_seconds": max(0.0, float(network_cfg.get("retry_delay_seconds", 1.5))),
         "retry_backoff": max(1.0, float(network_cfg.get("retry_backoff", 2.0))),
         "retry_statuses": [int(code) for code in retry_statuses],
     }
+
+
+def _retry_attempt_count(max_retries: int) -> int:
+    """Convert a retry count into a safe number of attempts."""
+    return max(1, int(max_retries))
 
 
 def _get_finance_entries(config: Dict[str, Any]) -> List[FinanceConfigEntry]:
@@ -468,12 +476,17 @@ def _request_with_retry(
     operation: str,
     timeout_seconds: Optional[int] = None,
     retry_statuses: Optional[List[int]] = None,
+    network_section: Optional[str] = None,
+    max_retries_override: Optional[int] = None,
     **kwargs: Any,
 ) -> requests.Response:
     """Execute an HTTP request with retry support for transient failures and statuses."""
-    network_cfg = _get_network_config(config)
+    network_cfg = _get_network_config(config, network_section)
     effective_timeout = timeout_seconds or int(network_cfg["request_timeout_seconds"])
     max_retries = int(network_cfg["max_retries"])
+    if max_retries_override is not None:
+        max_retries = max(0, int(max_retries_override))
+    attempt_count = _retry_attempt_count(max_retries)
     retry_delay_seconds = float(network_cfg["retry_delay_seconds"])
     retry_backoff = float(network_cfg["retry_backoff"])
     statuses = retry_statuses or list(network_cfg["retry_statuses"])
@@ -482,12 +495,12 @@ def _request_with_retry(
     last_response: Optional[requests.Response] = None
     response_to_return: Optional[requests.Response] = None
 
-    for attempt in range(1, max_retries + 1):
-        LOGGER.info("%s (attempt %s/%s)", operation, attempt, max_retries)
+    for attempt in range(1, attempt_count + 1):
+        LOGGER.info("%s (attempt %s/%s)", operation, attempt, attempt_count)
         try:
             response = requests.request(method, url, timeout=effective_timeout, **kwargs)
             last_response = response
-            if response.status_code in statuses and attempt < max_retries:
+            if response.status_code in statuses and attempt < attempt_count:
                 wait_seconds = _retry_sleep_seconds(retry_delay_seconds, retry_backoff, attempt)
                 LOGGER.warning(
                     "%s returned retryable HTTP %s; retrying in %.1fs",
@@ -501,13 +514,12 @@ def _request_with_retry(
             response_to_return = response
             break
         except requests.RequestException as exc:
-            LOGGER.warning("%s failed on attempt %s/%s: %s", operation, attempt, max_retries, exc)
+            LOGGER.warning("%s failed on attempt %s/%s: %s", operation, attempt, attempt_count, exc)
             last_exc = exc
-            if attempt >= max_retries:
-                break
-            wait_seconds = _retry_sleep_seconds(retry_delay_seconds, retry_backoff, attempt)
-            LOGGER.info("Retrying %s in %.1fs", operation, wait_seconds)
-            time.sleep(wait_seconds)
+            if attempt < attempt_count:
+                wait_seconds = _retry_sleep_seconds(retry_delay_seconds, retry_backoff, attempt)
+                LOGGER.info("Retrying %s in %.1fs", operation, wait_seconds)
+                time.sleep(wait_seconds)
 
     if last_exc is not None:
         raise last_exc
@@ -529,14 +541,15 @@ def _run_with_retries(
     """Run an arbitrary callable with retry/backoff logic and return its result."""
     last_exc: Optional[Exception] = None
     result: Optional[T] = None
-    for attempt in range(1, max_retries + 1):
+    attempt_count = _retry_attempt_count(max_retries)
+    for attempt in range(1, attempt_count + 1):
         try:
             result = func(attempt)
             break
         except Exception as exc:
-            LOGGER.warning("%s failed on attempt %s/%s: %s", operation, attempt, max_retries, exc)
+            LOGGER.warning("%s failed on attempt %s/%s: %s", operation, attempt, attempt_count, exc)
             last_exc = exc
-            if attempt >= max_retries:
+            if attempt >= attempt_count:
                 break
             wait_seconds = _retry_sleep_seconds(retry_delay_seconds, retry_backoff, attempt)
             LOGGER.info("Retrying %s in %.1fs", operation, wait_seconds)
@@ -928,7 +941,7 @@ def _resolve_weather_location(config: Dict[str, Any], lang: str) -> Tuple[float,
     lon = weather_cfg.get("longitude")
 
     if address_query:
-        network_cfg = _get_network_config(config)
+        network_cfg = _get_network_config(config, "weather")
         geolocator = Nominatim(user_agent="daypulse/1.0")
 
         def _geocode(_: int) -> Any:
@@ -1033,6 +1046,7 @@ def fetch_weather(config: Dict[str, Any], lang: str) -> WeatherPayload:
         "GET",
         url,
         operation="Weather request to Open-Meteo",
+        network_section="weather",
         params=params,
     )
     resp.raise_for_status()
@@ -1128,7 +1142,7 @@ def fetch_weather(config: Dict[str, Any], lang: str) -> WeatherPayload:
 def fetch_finance(config: Dict[str, Any]) -> FinancePayload:
     """Fetch quote snapshots for configured tickers using yfinance."""
     entries = _get_finance_entries(config)
-    network_cfg = _get_network_config(config)
+    network_cfg = _get_network_config(config, "finance")
 
     indices: List[FinanceIndex] = []
     if not entries:
@@ -1823,7 +1837,7 @@ def send_to_trmnl(
     merge_variables: Dict[str, Any],
     timeout_seconds: int,
 ) -> requests.Response:
-    """Send the webhook payload to TRMNL using the configured retry policy."""
+    """Send the webhook payload to TRMNL without retrying after the initial attempt."""
     payload_json = _build_trmnl_payload_json(merge_variables)
     payload_soft_limit_bytes = _get_trmnl_payload_soft_limit_bytes(config)
     LOGGER.info(
@@ -1838,6 +1852,8 @@ def send_to_trmnl(
         webhook_url,
         operation="TRMNL webhook POST",
         timeout_seconds=timeout_seconds,
+        network_section="trmnl",
+        max_retries_override=0,
         headers={"Content-Type": "application/json"},
         data=payload_json,
     )

@@ -17,21 +17,27 @@ general:
     file: trmnl_dashboard.log
     max_bytes: 1048576   # 1 MiB per log file before rotation
     backup_count: 5      # keep up to 5 rotated log files
+
+trmnl:
+  webhook_url: "https://trmnl.com/api/custom_plugins/PUT-YOUR-PLUGIN-SETTINGS-UUID-HERE"
+  timeout_seconds: 15
+  payload_soft_limit_bytes: 2048
+  network:
+    request_timeout_seconds: 15
+    max_retries: 0
+    retry_delay_seconds: 2.0
+    retry_backoff: 2.0
+    retry_statuses: [429, 500, 502, 503, 504]
+
+weather:
+  address: "San Francisco, CA, USA"
+  unit_system: imperial       # metric = celsius + km/h | imperial = fahrenheit + mph
   network:
     request_timeout_seconds: 20
     max_retries: 3
     retry_delay_seconds: 2.0
     retry_backoff: 2.0
     retry_statuses: [429, 500, 502, 503, 504]
-
-trmnl:
-  webhook_url: "https://trmnl.com/api/custom_plugins/PUT-YOUR-PLUGIN-SETTINGS-UUID-HERE"
-  timeout_seconds: 15
-  payload_soft_limit_bytes: 2048
-
-weather:
-  address: "San Francisco, CA, USA"
-  unit_system: imperial       # metric = celsius + km/h | imperial = fahrenheit + mph
   # The UI still shows a city label resolved from Nominatim.
   # Legacy fallback remains supported if needed:
   # city: "San Francisco"
@@ -42,6 +48,12 @@ weather:
   # wind_speed_unit: kmh        # kmh | mph | ms | kn
 
 finance:
+  network:
+    request_timeout_seconds: 20
+    max_retries: 3
+    retry_delay_seconds: 2.0
+    retry_backoff: 2.0
+    retry_statuses: [429, 500, 502, 503, 504]
   entries:
     - symbol: "^FCHI"
       label: "CAC 40 🇫🇷"

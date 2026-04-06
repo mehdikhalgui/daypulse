@@ -36,12 +36,14 @@ You can also pin file locations in `general.paths.translations_yaml` and `genera
 
 Optional additions in the YAML config:
 
-- `general.network.request_timeout_seconds`, `max_retries`, `retry_delay_seconds`, `retry_backoff`, `retry_statuses`
 - `general.paths.translations_yaml`, `markup_liquid` to configure the translation YAML and Liquid template paths
 - `general.log.mode`, `level`, `file`, `max_bytes`, `backup_count` to control file/console logging and log rotation
 - `trmnl.payload_soft_limit_bytes` to tune the payload-size warning threshold
+- `trmnl.network.request_timeout_seconds`, `max_retries`, `retry_delay_seconds`, `retry_backoff`, `retry_statuses` to tune webhook delivery independently
 - `weather.address` to geocode a postal address via Nominatim and automatically resolve the city name shown in the UI
+- `weather.network.request_timeout_seconds`, `max_retries`, `retry_delay_seconds`, `retry_backoff`, `retry_statuses` for geocoding and Open-Meteo calls
 - `weather.unit_system` to switch between traditional unit sets: `metric` (`°C` + `km/h`) or `imperial` (`°F` + `mph`)
+- `finance.network.request_timeout_seconds`, `max_retries`, `retry_delay_seconds`, `retry_backoff`, `retry_statuses` for quote loading retries
 - `finance.entries[]` to define each instrument with `symbol`, `label`, `currency`, and `show_currency`
 
 For weather, `metric` is the default and matches the usual European convention. `imperial` follows the common US convention. The recommended setup is now `weather.address`; the script geocodes it with Nominatim, uses the resulting coordinates for Open-Meteo, and keeps showing a city label in the UI. Legacy `weather.city`, `weather.latitude`, `weather.longitude`, `weather.temperature_unit`, and `weather.wind_speed_unit` remain supported for advanced or fallback cases.
@@ -138,7 +140,7 @@ The preview renderer uses [preview_template.html](preview_template.html).
 
 - TRMNL webhook rate limits apply (see TRMNL docs). Keep payload small by limiting calendar events.
 - For UI changes, prefer TRMNL framework primitives and utilities first (`title`, `value`, `label`, spacing/layout classes). Use inline size overrides only as a final small adjustment when the framework scale is close but not quite right.
-- Network calls now use configurable retries and backoff.
+- Network settings are now scoped per section (`trmnl`, `weather`, `finance`), with legacy fallback to `general.network` for older configs.
 - `finance.entries` keeps ticker symbol, label and currency behavior together in one place.
 - Set `show_currency: false` for instruments like the CAC 40 when you do not want a unit displayed.
 - The script (DayPulse) logs the serialized webhook payload size and warns when it approaches or exceeds a practical soft limit of 2048 bytes.
