@@ -1163,21 +1163,29 @@ def fetch_finance(config: Dict[str, Any]) -> FinancePayload:
                 def _load_symbol(_: int) -> Tuple[Any, Any, Optional[Dict[str, Any]]]:
                     """Load history and metadata for one ticker inside the retry wrapper."""
                     ticker = yf.Ticker(symbol)
-                    history = ticker.history(period="1d", interval="5m")
-                    if history is None or history.empty:
-                        LOGGER.debug("[finance] %s has no intraday data, falling back to daily history", symbol)
-                        history = ticker.history(period="5d", interval="1d")
-                    if history is None or history.empty:
-                        raise RuntimeError("No market data returned")
+
                     info = None
-                    if configured_label is None or configured_currency is None:
+                    current_price = None
+                    previous_close = None
+
+                    hist = ticker.history(period="2d")
+                    if len(hist) >= 2:
+                        current_price = hist["Close"].iloc[-1]
+                        previous_close = hist["Close"].iloc[-2]
+
+                    # fallback via info
+                    if configured_label is None or configured_currency is None or current_price is None or previous_close is None:
                         try:
                             info = getattr(ticker, "info", None)
                         except Exception as info_exc:
                             LOGGER.debug("[finance] %s info lookup failed: %s", symbol, info_exc)
-                    return ticker, history, info
+                        if info:
+                            current_price = current_price or info.get("currentPrice") or info.get("regularMarketPrice")
+                            previous_close = previous_close or info.get("previousClose")
 
-                _, hist, info = _run_with_retries(
+                    return ticker, current_price, previous_close, info
+
+                _, current_price, previous_close, info = _run_with_retries(
                     f"Finance request for {symbol}",
                     max_retries=int(network_cfg["max_retries"]),
                     retry_delay_seconds=float(network_cfg["retry_delay_seconds"]),
@@ -1185,14 +1193,12 @@ def fetch_finance(config: Dict[str, Any]) -> FinancePayload:
                     func=_load_symbol,
                 )
 
-                open_price = float(hist["Open"].iloc[0]) if "Open" in hist.columns else float(hist["Close"].iloc[0])
-                last_price = float(hist["Close"].iloc[-1]) if "Close" in hist.columns else float(hist.iloc[-1][0])
-                change = (last_price - open_price) / open_price * 100.0 if open_price else 0.0
+                change = (current_price - previous_close) / previous_close * 100.0 if current_price and previous_close else 0.0
                 arrow = "▲" if change >= 0 else "▼"
                 label = _resolve_finance_label(symbol, configured_label, info)
                 currency = _resolve_finance_currency(symbol, configured_currency, info)
                 show_currency = _resolve_show_currency(entry, currency)
-                formatted_price = _format_price_with_currency(last_price, currency, show_currency=show_currency)
+                formatted_price = _format_price_with_currency(current_price, currency, show_currency=show_currency)
 
                 indices.append(
                     {
