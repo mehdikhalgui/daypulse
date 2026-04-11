@@ -99,6 +99,7 @@ google_calendar:
   oauth:
     credentials_json: "credentials.json"
     token_json: "token.json"
+    timeout_seconds: 180
   service_account:
     json: "service_account.json"
 

@@ -58,6 +58,7 @@ You can use either:
   - Create OAuth Desktop credentials in Google Cloud.
   - Save as `credentials.json` next to the script.
   - First run will open a browser and create `token.json`.
+  - If the browser is closed or the login is not completed, DayPulse now stops waiting after `google_calendar.oauth.timeout_seconds` (default: `180`) instead of blocking indefinitely.
 
 - **Service account** (headless):
   - Create a service account JSON key.
@@ -85,6 +86,7 @@ google_calendar:
   oauth:
     credentials_json: "credentials.json"
     token_json: "token.json"
+    timeout_seconds: 180
 ```
 
 ## 4) Run

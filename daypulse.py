@@ -500,20 +500,12 @@ def _request_with_retry(
         try:
             response = requests.request(method, url, timeout=effective_timeout, **kwargs)
             last_response = response
-            if response.status_code in statuses and attempt < attempt_count:
-                wait_seconds = _retry_sleep_seconds(retry_delay_seconds, retry_backoff, attempt)
-                LOGGER.warning(
-                    "%s returned retryable HTTP %s; retrying in %.1fs",
-                    operation,
-                    response.status_code,
-                    wait_seconds,
-                )
-                time.sleep(wait_seconds)
-                continue
+            if response.status_code in statuses:
+                raise Exception(f"HTTP {response.status_code}")
             last_exc = None
             response_to_return = response
             break
-        except requests.RequestException as exc:
+        except Exception as exc:
             LOGGER.warning("%s failed on attempt %s/%s: %s", operation, attempt, attempt_count, exc)
             last_exc = exc
             if attempt < attempt_count:
@@ -1238,11 +1230,29 @@ def fetch_finance(config: Dict[str, Any]) -> FinancePayload:
     return {"ok": any_success, "indices": indices}
 
 
-def _build_calendar_service_oauth(credentials_json: str, token_json: str) -> Any:
+def _run_google_oauth_local_server(credentials_json: str, scopes: List[str], timeout_seconds: int) -> Any:
+    """Run the interactive Google OAuth browser flow with a finite wait time."""
+    from google_auth_oauthlib.flow import InstalledAppFlow, WSGITimeoutError
+
+    flow = InstalledAppFlow.from_client_secrets_file(credentials_json, scopes)
+    LOGGER.warning(
+        "Google OAuth login required. A browser window will open and the local callback will wait up to %ss.",
+        timeout_seconds,
+    )
+    try:
+        return flow.run_local_server(port=0, timeout_seconds=timeout_seconds)
+    except WSGITimeoutError as exc:
+        raise RuntimeError(
+            "Google OAuth timed out before completion. If you closed the browser or did not finish login, rerun the script and complete the consent flow, or increase google_calendar.oauth.timeout_seconds."
+        ) from exc
+    except KeyboardInterrupt as exc:
+        raise RuntimeError("Google OAuth cancelled by user.") from exc
+
+
+def _build_calendar_service_oauth(credentials_json: str, token_json: str, timeout_seconds: int = 180) -> Any:
     """Build a Google Calendar client using OAuth desktop credentials."""
     from google.auth.transport.requests import Request
     from google.oauth2.credentials import Credentials
-    from google_auth_oauthlib.flow import InstalledAppFlow
     from googleapiclient.discovery import build
 
     scopes = ["https://www.googleapis.com/auth/calendar.readonly"]
@@ -1255,8 +1265,9 @@ def _build_calendar_service_oauth(credentials_json: str, token_json: str) -> Any
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            flow = InstalledAppFlow.from_client_secrets_file(credentials_json, scopes)
-            creds = flow.run_local_server(port=0)
+            if timeout_seconds < 1:
+                raise RuntimeError("Google OAuth timeout_seconds must be greater than or equal to 1")
+            creds = _run_google_oauth_local_server(credentials_json, scopes, timeout_seconds)
         with open(token_json, "w", encoding="utf-8") as f:
             f.write(creds.to_json())
 
@@ -1286,9 +1297,10 @@ def _build_calendar_service_from_config(config: Dict[str, Any]) -> Any:
 
     credentials_json = str(_as_dict(gcfg.get("oauth")).get("credentials_json", "")).strip()
     token_json = str(_as_dict(gcfg.get("oauth")).get("token_json", "token.json")).strip()
+    oauth_timeout_seconds = _resolve_positive_int(_as_dict(gcfg.get("oauth")).get("timeout_seconds", 180), 180, minimum=1)
     if not credentials_json:
         raise ValueError("google_calendar.oauth.credentials_json is required for oauth mode")
-    return _build_calendar_service_oauth(credentials_json, token_json)
+    return _build_calendar_service_oauth(credentials_json, token_json, timeout_seconds=oauth_timeout_seconds)
 
 
 def list_google_calendars(config: Dict[str, Any]) -> List[Dict[str, Any]]:
